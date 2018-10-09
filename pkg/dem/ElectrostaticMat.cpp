@@ -89,22 +89,19 @@ Real Law2_ScGeom_ElectrostaticPhys::DLVO_NRAdimExp_integrate_u(Real const& un, R
 	{
 		a = (std::exp(d) < eps) ? alpha : 0.; // Alpha = 0 for non-contact
 		
-		Real ratio = (dt*theta*(un - (1.+a)*std::exp(d) + a*eps + Z*K*std::exp(-K*std::exp(d)) - A*std::exp(-2.*d))-1.+std::exp(prev_d-d)*(1.+dt*(1.-theta)*prevDotU))/(theta*dt*(un-2.*(1.+a)*std::exp(d) + a*eps + Z*K*std::exp(-K*std::exp(d))*(1.-K*std::exp(d))+A*std::exp(-2.*d)) -1.);
+		Real F = theta*dt*(un - std::exp(d)*(1.+a) + a*eps - K*Z*std::exp(-K*std::exp(d)) + A*std::exp(-2.*d)) + ((1.-theta)*dt*prevDotU + 1.)*std::exp(prev_d-d) - 1.;
+		Real F_ = theta*dt*(un - 2.*(1.+a)*std::exp(d) + a*eps + (K*std::exp(d)-1.)*K*Z*std::exp(-K*std::exp(d)) - A*std::exp(-2.*d)) - 1.;
 		
- 		Real F = theta*dt*((un - (1.+a)*std::exp(d) + a*eps + Z*K*std::exp(-K*std::exp(d)))*std::exp(d) - A*std::exp(-d)) + dt*(1.-theta)*std::exp(prev_d)*prevDotU - std::exp(d) + std::exp(prev_d);
+		d = d - F/F_;
 		
-		d = d - ratio;
-		
-		if(verbose) LOG_DEBUG("d " << d << " ratio " << ratio << " F " << F << " i " << i << " a " << a << " depth " << depth << " AZK" << A << Z << K);
-		
-		if(std::abs(F) < NewtonRafsonTol)
+		if(std::abs(F*std::exp(d)) < NewtonRafsonTol)
 			break;
 	}
 	
 	if(i < NewtonRafsonMaxIter || depth > maxSubSteps) {
-		if(depth > maxSubSteps && debug) LOG_WARN("Max Substepping reach: results may be inconsistant");
+		if(depth > maxSubSteps && debug) LOG_WARN("Max Substepping reach: results may be inconsistant d=" << d);
 		
-		prevDotU = un-(1.+a)*std::exp(d) + a*eps + Z*K*std::exp(-K*std::exp(d)) - A*std::exp(-2.*d);
+		prevDotU = un-(1.+a)*std::exp(d) + a*eps - Z*K*std::exp(-K*std::exp(d)) + A*std::exp(-2.*d);
 		return d;
 	} else {
 		// Substepping
