@@ -101,7 +101,7 @@ Real Law2_ScGeom_ImplicitLubricationPhys::NRAdimExp_integrate_u(Real const& un, 
 	Real d = prev_d;
 	
 	int i;
-	Real a(0);
+	Real a(0), F;
 	
 	for(i=0;i<NewtonRafsonMaxIter;i++)
 	{
@@ -109,18 +109,18 @@ Real Law2_ScGeom_ImplicitLubricationPhys::NRAdimExp_integrate_u(Real const& un, 
 		
 		Real ratio = (dt*(theta*(-(1.+a)*std::exp(d) + a*eps + un) + (1.-theta)*std::exp(prev_d - d)*prevDotU) - 1. + std::exp(prev_d - d))/(dt*theta*(-2.*(1.+a)*std::exp(d) + a*eps + un) - 1.);
 		
- 		Real F = theta*std::exp(d)*(-(1.+a)*std::exp(d) + a*eps+un) + (1.-theta)*std::exp(prev_d)*prevDotU - 1./dt*(std::exp(d) - std::exp(prev_d));
+ 		F = theta*std::exp(d)*(-(1.+a)*std::exp(d) + a*eps+un) + (1.-theta)*std::exp(prev_d)*prevDotU - 1./dt*(std::exp(d) - std::exp(prev_d));
 		
 		d = d - ratio;
 		
-		if(debug) LOG_DEBUG("d " << d << " ratio " << ratio << " F " << F << " i " << i << " a " << a << " depth " << depth);
-		
 		if(std::abs(F) < NewtonRafsonTol)
 			break;
+		
+		if(debug) LOG_DEBUG("d " << d << " ratio " << ratio << " F " << F << " i " << i << " a " << a << " depth " << depth);
 	}
 	
 	if(i < NewtonRafsonMaxIter || depth > maxSubSteps) {
-		if(depth > maxSubSteps) LOG_WARN("Max Substepping reach: results may be inconsistant");
+		if(depth > maxSubSteps) LOG_WARN("Max Substepping reach: results may be inconsistant F=" << F);
 		
 		prevDotU = -(1.+a)*std::exp(d) + a*eps + un;
 		return d;
@@ -129,6 +129,83 @@ Real Law2_ScGeom_ImplicitLubricationPhys::NRAdimExp_integrate_u(Real const& un, 
 		Real d_mid = NRAdimExp_integrate_u(un - undot*dt/2., eps, alpha, prevDotU, dt/2., prev_d, undot, depth+1);
 		return NRAdimExp_integrate_u(un, eps, alpha, prevDotU, dt/2., d_mid, undot, depth+1);
 	}
+}
+
+Real Law2_ScGeom_ImplicitLubricationPhys::normalForce_DichoAdimExp(LubricationPhys *phys, ScGeom* geom, Real undot, bool isNew)
+{
+	// Dry contact
+	if(phys->nun <= 0.) {
+		if(!warnedOnce) LOG_WARN("Can't solve with dimentionless-exponential method without fluid! using exact.");
+		warnedOnce = true;
+		return normalForce_trapezoidal(phys, geom, undot, isNew); }
+	
+	Real a((geom->radius1+geom->radius2)/2.);
+	if(isNew) { phys->u = -geom->penetrationDepth-undot*scene->dt; phys->delta = std::log(phys->u/a); }
+	
+	Real d = NRAdimExp_integrate_u(-geom->penetrationDepth/a, 2.*phys->eps, 1., phys->prevDotU, scene->dt*a*phys->kn/phys->nun, phys->delta, phys->nun/phys->kn/std::pow(a,2)*undot); // Dimentionless-exponential resolution!!
+	
+	phys->normalForce = phys->kn*(-geom->penetrationDepth-a*std::exp(d))*geom->normal;
+	phys->normalContactForce = (phys->nun > 0.) ? Vector3r(-phys->kn*(std::max(2.*a*phys->eps-a*std::exp(d),0.))*geom->normal) : phys->normalForce;
+	phys->normalLubricationForce = phys->normalForce - phys->normalContactForce;
+	
+	phys->delta = d;
+	phys->u = a*std::exp(d);
+	
+	phys->contact = phys->normalContactForce.norm() != 0;
+	phys->ue = -geom->penetrationDepth - phys->u;
+	
+	return phys->u;
+}
+
+Real Law2_ScGeom_ImplicitLubricationPhys::DichoAdimExp_integrate_u(Real const& un, Real const& eps, Real const& alpha, Real & prevDotU, Real const& dt, Real const& prev_d, Real const& undot, int depth)
+{
+	Real d_left, d_right, F_left, F_right;
+	
+	Real F = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, prev_d);
+	Real d;
+	
+	if(F < 0.)
+	{
+		d_left = prev_d;
+		F_left = F;
+		d_right = prev_d + 1.;
+		F_right = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, d_right);
+	}
+	else
+	{
+		d_right = prev_d;
+		F_right = F;
+		d_left = prev_d + 1.;
+		F_left = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, d_left);
+	}
+	
+	int i;
+	for(i=0;i<NewtonRafsonMaxIter;i++)
+	{
+		if(F_left*F_right > 0.)
+			LOG_ERROR("Both function have same sign!! d_left=" << d_left << " F_left=" << F_left << " d_right=" << d_right << "F_right=" << F_right);
+		
+		d = (d_left + d_right)/2.;	
+		F = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, d);
+		
+		if(F*F_left < 0.)
+		{
+			F_right = F;
+			d_right = d;
+		}
+		else
+		{
+			F_left = F;
+			d_left = d;
+		}
+	}
+}
+
+Real Law2_ScGeom_ImplicitLubricationPhys::ObjF(Real const& un, Real const& eps, Real const& alpha, Real & prevDotU, Real const& dt, Real const& prev_d, Real const& undot, Real const& d)
+{
+	Real a = (std::exp(d) < eps) ? alpha : 0.;
+
+	return theta*std::exp(d)*(-(1.+a)*std::exp(d) + a*eps+un) + (1.-theta)*std::exp(prev_d)*prevDotU - 1./dt*(std::exp(d) - std::exp(prev_d))
 }
 
 
@@ -397,6 +474,7 @@ bool Law2_ScGeom_ImplicitLubricationPhys::go(shared_ptr<IGeom> &iGeom, shared_pt
 			case 0: normalForce_trapezoidal(phys,geom, undot, isNew); break;
 			case 1: normalForce_NRAdimExp(phys, geom, undot, isNew); break;
 			case 2: normalForce_NewtonRafson(phys, geom, undot, isNew); break;
+			case 3: normalForce_DichoAdimExp(phys, geom, undot, isNew); break;
 			default:
 			LOG_WARN("Nonexistant resolution method. Using exact (0).");
 			normalForce_trapezoidal(phys,geom, undot, isNew); break;
@@ -460,7 +538,7 @@ void Law2_ScGeom_ImplicitLubricationPhys::computeShearForceAndTorques(Lubricatio
 void Law2_ScGeom_ImplicitLubricationPhys::computeShearForceAndTorques_log(LubricationPhys *phys, ScGeom* geom, State * s1, State *s2, Vector3r & C1, Vector3r & C2)
 {
 	Real a((geom->radius1+geom->radius2)/2.);
-	if(resolution != 1) { LOG_DEBUG("This method use log(u/a) for shear and torque component calculation. Make sure phys->delta is set before calling this method."); }
+	if(resolution != 1 && resolution != 3 && debug && !warnedOnce) { LOG_DEBUG("This method use log(u/a) for shear and torque component calculation. Make sure phys->delta is set before calling this method."); warnedOnce = true; }
 		
 	if(activateTangencialLubrication) shearForce_firstOrder_log(phys,geom);
 	else {phys->shearForce = Vector3r::Zero(); phys->shearContactForce = Vector3r::Zero(); phys->shearLubricationForce = Vector3r::Zero();}

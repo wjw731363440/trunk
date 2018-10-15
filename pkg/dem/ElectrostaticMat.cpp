@@ -1,6 +1,7 @@
 // 2016 © William Chèvremont <william.chevremont@univ-grenoble-alpes.fr>
 
 #include"ElectrostaticMat.hpp"
+#include <../../media/datas/Yade/trunk/lib/base/Math.hpp>
 
 
 YADE_PLUGIN((ElectrostaticMat)(Ip2_ElectrostaticMat_ElectrostaticMat_ElectrostaticPhys)(ElectrostaticPhys)(Law2_ScGeom_ElectrostaticPhys))
@@ -62,7 +63,7 @@ Real Law2_ScGeom_ElectrostaticPhys::normalForce_DLVO_NR(ElectrostaticPhys* phys,
 	Real a((geom->radius1+geom->radius2)/2.);
 	if(isNew) { phys->u = -geom->penetrationDepth-undot*scene->dt; phys->delta = std::log(phys->u/a); }
 	
-	Real d = DLVO_NRAdimExp_integrate_u(-geom->penetrationDepth/a, 2.*phys->eps, 1., phys->A/(6.*phys->kn*a*a), phys->Z/(phys->kn*a), a/phys->DebyeLength, phys->prevDotU, scene->dt*a*phys->kn/phys->nun, phys->delta); // Dimentionless-exponential resolution!!
+	Real d = DLVO_NRAdimExp_integrate_u(-geom->penetrationDepth/a, 2.*phys->eps, 1.0, phys->A/(6.*phys->kn*a*a), phys->Z/(phys->kn*a), a/phys->DebyeLength, phys->prevDotU, scene->dt*a*phys->kn/phys->nun, phys->delta, phys->nun/phys->kn/std::pow(a,2)*undot); // Dimentionless-exponential resolution!!
 	
 	phys->normalForce = phys->kn*(-geom->penetrationDepth-a*std::exp(d))*geom->normal;
 	phys->normalContactForce = (phys->nun > 0.) ? Vector3r(-phys->kn*(std::max(2.*a*phys->eps-a*std::exp(d),0.))*geom->normal) : phys->normalForce;
@@ -78,35 +79,45 @@ Real Law2_ScGeom_ElectrostaticPhys::normalForce_DLVO_NR(ElectrostaticPhys* phys,
 	return phys->u;
 }
 
-Real Law2_ScGeom_ElectrostaticPhys::DLVO_NRAdimExp_integrate_u(Real const& un, Real const& eps, Real const& alpha, Real const& A, Real const& Z, Real const& K, Real & prevDotU, Real const& dt, Real const& prev_d, int depth)
+Real Law2_ScGeom_ElectrostaticPhys::DLVO_NRAdimExp_integrate_u(Real const& un, Real const& eps, Real const& alpha, Real const& A, Real const& Z, Real const& K, Real & prevDotU, Real const& dt, Real const& prev_d, Real const& undot, int depth)
 {
 	Real d = prev_d;
 	
 	int i;
-	Real a(0);
+	Real a(0), F;
 	
 	for(i=0;i<NewtonRafsonMaxIter;i++)
 	{
 		a = (std::exp(d) < eps) ? alpha : 0.; // Alpha = 0 for non-contact
+/*
+		Real ratio = (theta*(un - std::exp(d)*(1.+a) + a*eps + K*Z*std::exp(-K*std::exp(d)) - A*std::exp(-2.*d)) + ((1.-theta)*prevDotU + 1./dt)*std::exp(prev_d-d) - 1./dt)/(theta*(un - 2.*(1.+a)*std::exp(d) + a*eps + (1.-K*std::exp(d))*K*Z*std::exp(-K*std::exp(d)) + A*std::exp(-2.*d)) - 1./dt);
 		
-		Real F = theta*dt*(un - std::exp(d)*(1.+a) + a*eps - K*Z*std::exp(-K*std::exp(d)) + A*std::exp(-2.*d)) + ((1.-theta)*dt*prevDotU + 1.)*std::exp(prev_d-d) - 1.;
-		Real F_ = theta*dt*(un - 2.*(1.+a)*std::exp(d) + a*eps + (K*std::exp(d)-1.)*K*Z*std::exp(-K*std::exp(d)) - A*std::exp(-2.*d)) - 1.;
+		Real F = theta*(std::exp(d)*(un - (1.+a)*std::exp(d) + a*eps + Z*K*std::exp(-K*std::exp(d))) - A*std::exp(-d)) + (1.-theta)*prevDotU + 1./dt*(std::exp(prev_d) - std::exp(d));
+		//*/
+		//*
+		Real ratio = (theta*(un - std::exp(d)*(1.+a) + a*eps + K*Z*std::exp(-K*std::exp(d))) + ((1.-theta)*prevDotU + 1./dt)*std::exp(prev_d-d) - 1./dt)/(theta*(un - 2.*(1.+a)*std::exp(d) + a*eps + (1.-K*std::exp(d))*K*Z*std::exp(-K*std::exp(d))) - 1./dt);
 		
-		d = d - F/F_;
+		F = theta*(std::exp(d)*(un - (1.+a)*std::exp(d) + a*eps + Z*K*std::exp(-K*std::exp(d)))) + (1.-theta)*prevDotU + 1./dt*(std::exp(prev_d) - std::exp(d));
 		
-		if(std::abs(F*std::exp(d)) < NewtonRafsonTol)
+		d = d - ratio;//*/
+		
+		if(std::abs(F) < NewtonRafsonTol)
 			break;
+		
+		if(debug && verbose) LOG_DEBUG("d " << d << " ratio " << ratio << " F " << F << " i " << i << " a " << a << " depth " << depth);
 	}
 	
-	if(i < NewtonRafsonMaxIter || depth > maxSubSteps) {
-		if(depth > maxSubSteps && debug) LOG_WARN("Max Substepping reach: results may be inconsistant d=" << d);
-		
-		prevDotU = un-(1.+a)*std::exp(d) + a*eps - Z*K*std::exp(-K*std::exp(d)) + A*std::exp(-2.*d);
+	if(i < NewtonRafsonMaxIter) {
+		prevDotU = un-(1.+a)*std::exp(d) + a*eps + Z*K*std::exp(-K*std::exp(d));
 		return d;
+	} else if (depth > maxSubSteps) {
+		if(debug) LOG_WARN("Max Substepping reach: results may be inconsistant d=" << d << " d_prev=" << prev_d << " un=" << un << " a=" << a << " K=" << K << " Z=" << Z << " eps=" << eps << " dt=" << dt);
+		return prev_d; // TODO: Better idea??
 	} else {
 		// Substepping
-		Real d_mid = DLVO_NRAdimExp_integrate_u(un, eps, alpha, A, Z, K, prevDotU, dt/2., prev_d, depth+1);
-		return DLVO_NRAdimExp_integrate_u(un, eps, alpha, A, Z, K, prevDotU, dt/2., d_mid, depth+1);
+		if(debug) LOG_WARN("Substepping: F=" << F << " d=" << d << " d_prev=" << prev_d << " un=" << un << " a=" << a << " K=" << K << " Z=" << Z << " eps=" << eps << " dt=" << dt);
+		Real d_mid = DLVO_NRAdimExp_integrate_u(un, eps, alpha, A, Z, K, prevDotU, dt/2., prev_d, undot, depth+1);
+		return DLVO_NRAdimExp_integrate_u(un, eps, alpha, A, Z, K, prevDotU, dt/2., d_mid, undot, depth+1);
 	}
 }
 
