@@ -1,7 +1,6 @@
 // 2016 © William Chèvremont <william.chevremont@univ-grenoble-alpes.fr>
 
 #include"ElectrostaticMat.hpp"
-#include <../../media/datas/Yade/trunk/lib/base/Math.hpp>
 
 
 YADE_PLUGIN((ElectrostaticMat)(Ip2_ElectrostaticMat_ElectrostaticMat_ElectrostaticPhys)(ElectrostaticPhys)(Law2_ScGeom_ElectrostaticPhys))
