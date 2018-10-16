@@ -79,7 +79,10 @@ Real Law2_ScGeom_ImplicitLubricationPhys::normalForce_AdimExp(LubricationPhys *p
 		return normalForce_trapezoidal(phys, geom, undot, isNew); }
 	
 	Real a((geom->radius1+geom->radius2)/2.);
-	if(isNew) { phys->u = -geom->penetrationDepth-undot*scene->dt; phys->delta = std::log(phys->u/a); }
+	if(isNew) { phys->u = -geom->penetrationDepth; 
+		if(phys->u < 0.)
+			LOG_ERROR("phys->u < 0 at starting point!!!");
+		phys->delta = std::log(phys->u/a); }
 	
 	Real d;
 	if(dichotomie)
@@ -148,7 +151,15 @@ Real Law2_ScGeom_ImplicitLubricationPhys::DichoAdimExp_integrate_u(Real const& u
 		d_right++;
 		F_left = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, d_left);
 		F_right = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, d_right);
+		
+		if(!std::isfinite(d_left) || !std::isfinite(d_right))
+		{
+			LOG_ERROR("UNABLE to find starting point d_left=" << d_left << " F_left=" << F_left << " d_right=" << d_right << " F_right=" << F_right << " prev_d=" << prev_d);
+			break;
+		}
 	}
+	
+	if(verbose) LOG_ERROR("starting point ::  d_left=" << d_left << " F_left=" << F_left << " d_right=" << d_right << " F_right=" << F_right << " prev_d=" << prev_d);
 	
 	// Iterate to find the zero.
 	int i;
@@ -156,6 +167,12 @@ Real Law2_ScGeom_ImplicitLubricationPhys::DichoAdimExp_integrate_u(Real const& u
 	{
 		if(F_left*F_right > 0.)
 			LOG_ERROR("Both function have same sign!! d_left=" << d_left << " F_left=" << F_left << " d_right=" << d_right << " F_right=" << F_right);
+		
+		if(!std::isfinite(d_left) || !std::isfinite(d_right))
+		{
+			LOG_ERROR("WTF!! d_left=" << d_left << " F_left=" << F_left << " d_right=" << d_right << " F_right=" << F_right << " prev_d=" << prev_d);
+			break;
+		}
 		
 		d = (d_left + d_right)/2.;	
 		F = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, d);
