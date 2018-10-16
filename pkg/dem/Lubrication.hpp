@@ -81,12 +81,11 @@ class Law2_ScGeom_ImplicitLubricationPhys: public LawFunctor{
 			Real normalForce_NewtonRafson(LubricationPhys *phys, ScGeom* geom, Real undot, bool isNew);
 			Real newton_integrate_u(Real const& un, Real const& nu, Real const& dt, Real const& k, Real const& g, Real const& u_prev, Real const& eps, int depth=0);
 			
-			Real normalForce_NRAdimExp(LubricationPhys *phys, ScGeom* geom, Real undot, bool isNew);
+			Real normalForce_AdimExp(LubricationPhys *phys, ScGeom* geom, Real undot, bool isNew, bool dichotomie);
 			Real NRAdimExp_integrate_u(Real const& un, Real const& eps, Real const& alpha, Real & prevDotU, Real const& dt, Real const& prev_d, Real const& undot, int depth=0);
-			
-			Real normalForce_DichoAdimExp(LubricationPhys *phys, ScGeom* geom, Real undot, bool isNew);
-			Real DichoAdimExp_integrate_u(Real const& un, Real const& eps, Real const& alpha, Real & prevDotU, Real const& dt, Real const& prev_d, Real const& undot, int depth=0);
-			Real ObjF(Real const& un, Real const& eps, Real const& alpha, Real & prevDotU, Real const& dt, Real const& prev_d, Real const& undot, Real const& d);
+
+			Real DichoAdimExp_integrate_u(Real const& un, Real const& eps, Real const& alpha, Real & prevDotU, Real const& dt, Real const& prev_d, Real const& undot);
+			Real ObjF(Real const& un, Real const& eps, Real const& alpha, Real const& prevDotU, Real const& dt, Real const& prev_d, Real const& undot, Real const& d);
 			
 			void shearForce_firstOrder(LubricationPhys *phys, ScGeom* geom);
 			void shearForce_firstOrder_log(LubricationPhys *phys, ScGeom* geom);
@@ -104,12 +103,12 @@ class Law2_ScGeom_ImplicitLubricationPhys: public LawFunctor{
 			((bool,activateTwistLubrication,true,,"Activate twist lubrication (default: true)"))
 			((bool,activateRollLubrication,true,,"Activate roll lubrication (default: true)"))
 			((bool,debug,false,,"Write debug informations"))
-			((bool,verbose,false,,"Write all debug informations"))
+			((bool,verbose,false,,"Write more debug informations"))
 			((int,maxSubSteps,4,,"max recursion depth of adaptative timestepping in the theta-method, the minimal time interval is thus :yref:`Omega::dt<O.dt>`$/2^{depth}$. If still not converged the integrator will switch to backward Euler."))
 			((Real,theta,0.55,,"parameter of the 'theta'-method, 1: backward Euler, 0.5: trapezoidal rule, 0: not used,  0.55: suggested optimum)"))
-			((int,resolution,0,,"Change normal component resolution method, 0: Iterative exact resolution (theta method, linear contact), 1: Newton-Rafson dimentionless resolution (theta method, linear contact), 2: Newton-Rafson with nonlinear surface deflection (Hertzian-like contact)"))
-			((Real, NewtonRafsonTol, 1.e-10,,"Tolerance for Newton-Rafson resolution"))
-			((int, NewtonRafsonMaxIter, 20,,"Maximum iterations for Newton-Rafson resolution"))
+			((int,resolution,0,,"Change normal component resolution method, 0: Iterative exact resolution (theta method, linear contact), 1: Newton-Rafson dimentionless resolution (theta method, linear contact), 2: Newton-Rafson with nonlinear surface deflection (Hertzian-like contact), 3: Dichotomy dimentionless resolution (theta method, linear contact)"))
+			((Real, SolutionTol, 1.e-10,,"Tolerance for numerical resolution"))
+			((int, MaxIter, 30,,"Maximum iterations for numerical resolution"))
 			,// CTOR
 			,// PY
 			.def("getStressForEachBody",&Law2_ScGeom_ImplicitLubricationPhys::PyGetStressForEachBody,"Get stresses tensors for each bodies: normal contact stress, shear contact stress, normal lubrication stress, shear lubrication stress.")

@@ -63,8 +63,11 @@ REGISTER_SERIALIZABLE(Ip2_ElectrostaticMat_ElectrostaticMat_ElectrostaticPhys);
 
 class Law2_ScGeom_ElectrostaticPhys: public Law2_ScGeom_ImplicitLubricationPhys{
 	public:
-		Real normalForce_DLVO_NR(ElectrostaticPhys *phys, ScGeom* geom, Real const& undot, bool isNew);
+		Real normalForce_DLVO_Adim(ElectrostaticPhys *phys, ScGeom* geom, Real const& undot, bool isNew, bool dichotomie);
 		Real DLVO_NRAdimExp_integrate_u(Real const& un, Real const& eps, Real const& alpha, Real const& A, Real const& Z, Real const& K, Real & prevDotU, Real const& dt, Real const& prev_d, Real const& undot, int depth=1);
+		
+		Real DLVO_DichoAdimExp_integrate_u(Real const& un, Real const& eps, Real const& alpha, Real const& A, Real const& Z, Real const& K, Real & prevDotU, Real const& dt, Real const& prev_d, Real const& undot);
+		Real ObjF(Real const& un, Real const& eps, Real const& alpha, Real const& prevDotU, Real const& dt, Real const& prev_d, Real const& undot, Real const& A, Real const& Z, Real const& K, Real const& d);
 		
 		static void getStressForEachBody(vector<Matrix3r>& DLVOStresses);
 		static py::tuple PyGetStressForEachBody();

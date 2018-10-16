@@ -51,7 +51,7 @@ CREATE_LOGGER(Ip2_ElectrostaticMat_ElectrostaticMat_ElectrostaticPhys);
 
 /********************** Law2_ScGeom_ElectrostaticPhys ****************************/
 
-Real Law2_ScGeom_ElectrostaticPhys::normalForce_DLVO_NR(ElectrostaticPhys* phys, ScGeom* geom, Real const& undot, bool isNew)
+Real Law2_ScGeom_ElectrostaticPhys::normalForce_DLVO_Adim(ElectrostaticPhys* phys, ScGeom* geom, Real const& undot, bool isNew, bool dicho)
 {
 	// Dry contact
 	if(phys->nun <= 0.) {
@@ -63,7 +63,12 @@ Real Law2_ScGeom_ElectrostaticPhys::normalForce_DLVO_NR(ElectrostaticPhys* phys,
 	Real a((geom->radius1+geom->radius2)/2.);
 	if(isNew) { phys->u = -geom->penetrationDepth-undot*scene->dt; phys->delta = std::log(phys->u/a); }
 	
-	Real d = DLVO_NRAdimExp_integrate_u(-geom->penetrationDepth/a, 2.*phys->eps, 1.0, phys->A/(6.*phys->kn*a*a), phys->Z/(phys->kn*a), a/phys->DebyeLength, phys->prevDotU, scene->dt*a*phys->kn/phys->nun, phys->delta, phys->nun/phys->kn/std::pow(a,2)*undot); // Dimentionless-exponential resolution!!
+	Real d;
+	
+	if(dicho)
+		d= DLVO_DichoAdimExp_integrate_u(-geom->penetrationDepth/a, 2.*phys->eps, 1.0, phys->A/(6.*phys->kn*a*a), phys->Z/(phys->kn*a), a/phys->DebyeLength, phys->prevDotU, scene->dt*a*phys->kn/phys->nun, phys->delta, phys->nun/phys->kn/std::pow(a,2)*undot); // Solution by dichotomy
+	else
+		d= DLVO_NRAdimExp_integrate_u(-geom->penetrationDepth/a, 2.*phys->eps, 1.0, phys->A/(6.*phys->kn*a*a), phys->Z/(phys->kn*a), a/phys->DebyeLength, phys->prevDotU, scene->dt*a*phys->kn/phys->nun, phys->delta, phys->nun/phys->kn/std::pow(a,2)*undot); // Dimentionless-exponential resolution!!
 	
 	phys->normalForce = phys->kn*(-geom->penetrationDepth-a*std::exp(d))*geom->normal;
 	phys->normalContactForce = (phys->nun > 0.) ? Vector3r(-phys->kn*(std::max(2.*a*phys->eps-a*std::exp(d),0.))*geom->normal) : phys->normalForce;
@@ -86,7 +91,7 @@ Real Law2_ScGeom_ElectrostaticPhys::DLVO_NRAdimExp_integrate_u(Real const& un, R
 	int i;
 	Real a(0), F;
 	
-	for(i=0;i<NewtonRafsonMaxIter;i++)
+	for(i=0;i<MaxIter;i++)
 	{
 		a = (std::exp(d) < eps) ? alpha : 0.; // Alpha = 0 for non-contact
 /*
@@ -101,13 +106,13 @@ Real Law2_ScGeom_ElectrostaticPhys::DLVO_NRAdimExp_integrate_u(Real const& un, R
 		
 		d = d - ratio;//*/
 		
-		if(std::abs(F) < NewtonRafsonTol)
+		if(std::abs(F) < SolutionTol)
 			break;
 		
 		if(debug && verbose) LOG_DEBUG("d " << d << " ratio " << ratio << " F " << F << " i " << i << " a " << a << " depth " << depth);
 	}
 	
-	if(i < NewtonRafsonMaxIter) {
+	if(i < MaxIter) {
 		prevDotU = un-(1.+a)*std::exp(d) + a*eps + Z*K*std::exp(-K*std::exp(d));
 		return d;
 	} else if (depth > maxSubSteps) {
@@ -119,6 +124,62 @@ Real Law2_ScGeom_ElectrostaticPhys::DLVO_NRAdimExp_integrate_u(Real const& un, R
 		Real d_mid = DLVO_NRAdimExp_integrate_u(un, eps, alpha, A, Z, K, prevDotU, dt/2., prev_d, undot, depth+1);
 		return DLVO_NRAdimExp_integrate_u(un, eps, alpha, A, Z, K, prevDotU, dt/2., d_mid, undot, depth+1);
 	}
+}
+
+Real Law2_ScGeom_ElectrostaticPhys::DLVO_DichoAdimExp_integrate_u(Real const& un, Real const& eps, Real const& alpha, Real const& A, Real const& Z, Real const& K, Real & prevDotU, Real const& dt, Real const& prev_d, Real const& undot)
+{
+	Real F = 0.;
+	Real d_left(prev_d), d_right(prev_d), F_left(F), F_right(F);
+	Real d;
+	
+	// Init: search for interval that contain sign change
+	while(F_left*F_right >= 0.)
+	{
+		d_left--;
+		d_right++;
+		F_left = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, A, Z, K, d_left);
+		F_right = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, A, Z, K, d_right);
+	}
+	
+	// Iterate to find the zero.
+	int i;
+	for(i=0;i<MaxIter;i++)
+	{
+		if(F_left*F_right > 0.)
+			LOG_ERROR("Both function have same sign!! d_left=" << d_left << " F_left=" << F_left << " d_right=" << d_right << " F_right=" << F_right);
+		
+		d = (d_left + d_right)/2.;	
+		F = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, A, Z, K, d);
+		
+		if(std::abs(F) < SolutionTol)
+			break;
+		
+		if(F*F_left < 0.)
+		{
+			F_right = F;
+			d_right = d;
+		}
+		else
+		{
+			F_left = F;
+			d_left = d;
+		}
+	}
+	
+	if(i == MaxIter)
+		LOG_WARN("Max iteration reach: d_left=" << d_left << " F_left=" << F_left << " d_right=" << d_right << " F_right=" << F_right);
+	
+	Real a = (std::exp(d) < eps) ? alpha : 0.;
+	prevDotU = -(1.+a)*std::exp(d) + a*eps + un + Z*K*std::exp(-K*std::exp(d));
+	
+	return d;
+}
+
+Real Law2_ScGeom_ElectrostaticPhys::ObjF(Real const& un, Real const& eps, Real const& alpha, Real const& prevDotU, Real const& dt, Real const& prev_d, Real const& undot, Real const& A, Real const& Z, Real const& K, Real const& d)
+{
+	Real a = (std::exp(d) < eps) ? alpha : 0.;
+	
+	return theta*(un - std::exp(d)*(1.+a) + a*eps + K*Z*std::exp(-K*std::exp(d))) + (1.-theta)*prevDotU*std::exp(prev_d-d) - 1./dt*(1.-std::exp(prev_d-d));
 }
 
 bool Law2_ScGeom_ElectrostaticPhys::go(shared_ptr<IGeom>& iGeom, shared_ptr<IPhys>& iPhys, Interaction* interaction)
@@ -154,7 +215,14 @@ bool Law2_ScGeom_ElectrostaticPhys::go(shared_ptr<IGeom>& iGeom, shared_ptr<IPhy
 	if(phys->u == -1. ) {phys->u = -geom->penetrationDepth; isNew=true;}
 	
 	// Solve normal
-	normalForce_DLVO_NR(phys,geom, undot,isNew);
+	
+	if(resolution != 1 && resolution != 3)
+	{
+		LOG_WARN("Resolution method must be 1 (Newton-Rafson) or 3 (Dichotomy). Using Dichotomy.");
+		resolution = 3;
+	}
+	
+	normalForce_DLVO_Adim(phys,geom, undot,isNew, resolution == 3);
 	
 	// Solve shear and torques
 	Vector3r C1 = Vector3r::Zero();
