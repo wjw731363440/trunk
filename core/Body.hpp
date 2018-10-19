@@ -106,7 +106,7 @@ class Body: public Serializable{
 		.add_property("iterBorn",&Body::iterBorn,"Returns step number at which the body was added to simulation.")
 		.add_property("timeBorn",&Body::timeBorn,"Returns time at which the body was added to simulation.")
 		.def_readwrite("chain",&Body::chain,"Returns Id of chain to which the body belongs.")
-		.def("intrs",&Body::py_intrs,"Return all interactions in which this body participates.")
+		.def("intrs",&Body::py_intrs,"Return list of all real interactions in which this body participates.")
 	);
 };
 REGISTER_SERIALIZABLE(Body);
