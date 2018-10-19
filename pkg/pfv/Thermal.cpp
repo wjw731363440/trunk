@@ -30,6 +30,8 @@ void ThermalEngine::action()
 			flow = dynamic_cast<FlowEngineT*>(e.get());
 		}
 	}
+	resetBoundaryFluxSums();
+	//resetStepFluxSums();
 	if (!boundarySet) setConductionBoundary(flow);
 	if (!conduction) thermoMech = false; //don't allow thermoMech if conduction is not activated
 	if (advection) {
@@ -37,7 +39,7 @@ void ThermalEngine::action()
 		flow->solver->augmentConductivityMatrix(scene->dt);
 	}
 	if (conduction) {
-		if (!energySet) initializeInternalEnergy();  // internal energy of particles
+		// if (!energySet) initializeInternalEnergy();  // internal energy of particles
 		computeSolidSolidFluxes(); 
 		if (advection) computeSolidFluidFluxes(flow);
 	}
@@ -48,6 +50,22 @@ void ThermalEngine::action()
 void ThermalEngine::makeThermalState() {
 	// loop through bodies and copy information over to new state
 }
+
+void ThermalEngine::resetBoundaryFluxSums() {
+	for (int i=0; i<6; i++) thermalBndFlux[i]=0;
+}
+
+//void ThermalEngine::resetStepFluxSums() {
+//	const shared_ptr<BodyContainer>& bodies=scene->bodies;
+//	const long size=bodies->size();
+////	#pragma omp parallel for
+//	for (long i=0; i<size; i++){
+//		const shared_ptr<Body>& b=(*bodies)[i];
+//		if (b->shape->getClassIndex()!=Sphere::getClassIndexStatic() || !b) continue;
+//		ThermalState* thState = YADE_CAST<ThermalState*>(b->state.get());
+//		thState->stepFlux = 0;
+//	}
+//}
 
 void ThermalEngine::setConductionBoundary(FlowEngineT* flow) {
 
@@ -81,6 +99,7 @@ void ThermalEngine::setConductionBoundary(FlowEngineT* flow) {
 						ThermalState* thState = YADE_CAST<ThermalState*>(b->state.get());
 						thState->Tcondition=true;
 						thState->temp=bi.value;
+						thState->boundaryId=bound;
 					}
 				}
 				flow->solver->conductionBoundingCells[bound].push_back(cell);
@@ -104,14 +123,13 @@ void ThermalEngine::initializeInternalEnergy() {
 }
 
 void ThermalEngine::computeSolidFluidFluxes(FlowEngineT* flow) {		
-	fluidK = flow->fluidK;
 	if (!flow->solver->sphericalVertexAreaCalculated) computeVertexSphericalArea(flow);
 	shared_ptr<BodyContainer>& bodies = scene->bodies;
 	Tesselation& Tes = flow->solver->T[flow->solver->currentTes];
 //	#ifdef YADE_OPENMP
 	const long size = Tes.cellHandles.size();
 //	#pragma omp parallel for num_threads(ompThreads>0 ? ompThreads : 1)
-    	for (long i=0; i<size; i++){
+    for (long i=0; i<size; i++){
 		CellHandle& cell = Tes.cellHandles[i];
 //	#else	
 		if (cell->info().isGhost) continue; // Do we need special cases for fictious cells?
@@ -154,7 +172,7 @@ void ThermalEngine::computeFlux(CellHandle& cell,const shared_ptr<Body>& b, cons
 	//const double areaRatio = surfaceArea/(4.*M_PI*sphere->radius*sphere->radius);
 	const double flux = h*surfaceArea*(cell->info().temp() - thState->temp); // Total surface accounted for through pores, but we also account for conduction area? Unphysical? 
 	if (!cell->info().Tcondition) cell->info().internalEnergy -= flux*scene->dt;
-	if (!thState->Tcondition) thState->U += flux*scene->dt;
+	if (!thState->Tcondition) thState->stepFlux += flux;  // thState->U += flux*scene->dt;
 }
 
 
@@ -169,7 +187,7 @@ void ThermalEngine::computeSolidSolidFluxes() {
 //	for (const auto & I : *scene->interactions){
 //	#endif
 		const ScGeom* geom;
-		if (!I || !I->geom.get() || !I->phys.get()) continue;
+		if (!I || !I->geom.get() || !I->phys.get() || !I->isReal()) continue;
 		if (I->geom.get()){
 			geom = YADE_CAST<ScGeom*> (I->geom.get());
 			if (!geom) continue;
@@ -183,8 +201,8 @@ void ThermalEngine::computeSolidSolidFluxes() {
 		Sphere* sphere1 = dynamic_cast<Sphere*>(b1_->shape.get());
 		Sphere* sphere2 = dynamic_cast<Sphere*>(b2_->shape.get());
 		
-		double& U1 = thState1->U;
-		double& U2 = thState2->U;	
+		//double& U1 = thState1->U;
+		//double& U2 = thState2->U;	
 		const double k1 = thState1->k;
 		const double k2 = thState2->k;
 		const double r1 = sphere1->radius;
@@ -201,11 +219,29 @@ void ThermalEngine::computeSolidSolidFluxes() {
 		// The radius of the intersection found by: Kern, W. F. and Bland, J. R. Solid Mensuration with Proofs, 2nd ed. New York: Wiley, p. 97, 1948.	http://mathworld.wolfram.com/Sphere-SphereIntersection.html	
 		const double numerator = pow((-d+r-R)*(-d-r+R)*(-d+r+R)*(d+r+R),0.5);	
 		const double rc = numerator / (2.*d);
-		const double dt = scene->dt;		
-		const double fluxij = 4.*rc*(T1-T2) / (1./k1 + 1./k2);
+		const double area = M_PI*pow(rc,2);
 		
-		if (!thState1->Tcondition) U1 -= fluxij*dt;
-		if (!thState2->Tcondition) U2 += fluxij*dt;
+		//const double dt = scene->dt;		
+		//const double fluxij = 4.*rc*(T1-T2) / (1./k1 + 1./k2);
+		
+		// compute the overlapping volume for thermodynamic considerations
+//		const double capHeight1 = (r1-r2+d)*(r1+r2-d)/2*d;
+//		const double capHeight2 = (r2-r1+d)*(r2+r1-d)/2*d;
+//		thState1->capVol += (1./3.)*M_PI*pow(capHeight1,2)*(3.*r1-capHeight1);
+//		thState2->capVol += (1./3.)*M_PI*pow(capHeight2,2)*(3.*r2-capHeight2);
+
+		// compute the thermal resistance of the pair and the associated flux
+		double thermalResist;
+		if (useKernMethod) {thermalResist = 4.*rc / (1./k1 + 1./k2);}//thermalResist = ((k1+k2)/2.)*area/(r1+r2-pd);}
+		else {thermalResist = 2.*(k1+k2)*r1*r2 / (r1+r2-pd);}
+		const double fluxij = thermalResist * (T1-T2);
+
+		//cout << "Flux b/w "<< b1_->id << " & "<< b2_->id << " fluxij " << fluxij << endl;
+		
+		if (!thState1->Tcondition) thState1->stepFlux -= fluxij; //U1 -= fluxij*dt;
+		else thermalBndFlux[thState1->boundaryId] -= fluxij;
+		if (!thState2->Tcondition) thState2->stepFlux += fluxij; // U2 += fluxij*dt;
+		else thermalBndFlux[thState2->boundaryId] += fluxij;
 		}
 	}
 }
@@ -219,9 +255,23 @@ void ThermalEngine::computeNewTemperatures(FlowEngineT* flow) {
 			const shared_ptr<Body>& b=(*bodies)[i];
 			if (b->shape->getClassIndex()!=Sphere::getClassIndexStatic() || !b) continue;
 			ThermalState* thState = YADE_CAST<ThermalState*>(b->state.get());
+			Sphere* sphere = dynamic_cast<Sphere*>(b->shape.get());
+			const double density = b->material->density;
+			const double volume = 4./3. * M_PI *pow(sphere->radius,3); // - thState->capVol;
 			if (thState->Tcondition) continue;
-			thState->oldTemp = thState->temp; 
-			thState->temp = thState->U/(thState->Cp*thState->mass); // + thState->temp;
+			if (!thState->oldTempSet){
+				thState->oldTemp = thState->temp; 
+				thState->temp = thState->stepFlux*scene->dt/(thState->Cp*density*volume) + thState->oldTemp; // first order forward difference
+				thState->stepFlux=0;
+				// thState->oldTempSet=true;
+			} else if (thState->oldTempSet){
+				thState->tempHold = thState->temp;
+				thState->temp = (1./3.)*(thState->stepFlux*2.*scene->dt/(thState->Cp*thState->mass) + 4.*thState->temp - thState->oldTemp);  // 2nd order backward difference
+				thState->oldTemp = thState->tempHold;
+				thState->stepFlux = 0;
+			}
+			//thState->oldTemp = thState->temp; //for thermal expansion
+			//thState->temp = thState->U/(thState->Cp*thState->mass); // + thState->temp;
 		}
 	}
 	if (advection) flow->solver->setNewCellTemps();
@@ -232,21 +282,31 @@ void ThermalEngine::thermalExpansion() {
 	const shared_ptr<BodyContainer>& bodies=scene->bodies;
 	const long size=bodies->size();
 
+    // adjust particle size
 	for (long i=0; i<size; i++){
 		const shared_ptr<Body> b=(*bodies)[i];
 		if (b->shape->getClassIndex()!=Sphere::getClassIndexStatic() || !b) continue;
 		Sphere* sphere = dynamic_cast<Sphere*>(b->shape.get());		
 		ThermalState* thState = YADE_CAST<ThermalState*>(b->state.get());
-		sphere->radius +=  thState->alpha * sphere->radius * (thState->temp - thState->oldTemp);
+        if (!thState->Tcondition) {
+            sphere->radius +=  thState->alpha * sphere->radius * (thState->temp - thState->oldTemp);
+        }
 	}
+	
+	// adjust cell pressure
+	if (fluidBeta <= 0) return;
+    Tesselation& Tes = flow->solver->T[flow->solver->currentTes];
+//	#ifdef YADE_OPENMP
+	const long sizeCells = Tes.cellHandles.size();
+//	#pragma omp parallel for num_threads(ompThreads>0 ? ompThreads : 1)
+    for (long i=0; i<sizeCells; i++){
+		CellHandle& cell = Tes.cellHandles[i];
+//	#else	
+		if (cell->info().isGhost || cell->info().Pcondition) continue; // Do we need special cases for fictious cells?
+        cell->info().p() += fluidK * ( (1./(1+fluidBeta*(cell->info().dtemp()))) - 1.);
+	}
+	
+	
 }
-
-
-
-
-
-
-
-
 
 #endif//THERMAL

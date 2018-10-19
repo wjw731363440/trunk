@@ -711,10 +711,14 @@ void FlowBoundingSphereLinSolv<_Tesselation,FlowType>::augmentConductivityMatrix
 template<class _Tesselation, class FlowType>
 void FlowBoundingSphereLinSolv<_Tesselation,FlowType>::setNewCellTemps()
 {
-        RTriangulation& Tri = T[currentTes].Triangulation();
-        FiniteCellsIterator cellEnd = Tri.finite_cells_end();
-        for (FiniteCellsIterator cell = Tri.finite_cells_begin(); cell != cellEnd; cell++){
-		if (!cell->info().Tcondition && !cell->info().isGhost) cell->info().temp()=cell->info().internalEnergy/(cell->info().volume()*fluidCp*fluidRho);
+    RTriangulation& Tri = T[currentTes].Triangulation();
+    FiniteCellsIterator cellEnd = Tri.finite_cells_end();
+    for (FiniteCellsIterator cell = Tri.finite_cells_begin(); cell != cellEnd; cell++){
+		if (!cell->info().Tcondition && !cell->info().isGhost) {
+            Real oldTemp = cell->info().temp();
+            cell->info().temp()=cell->info().internalEnergy/(cell->info().volume()*fluidCp*fluidRho);
+            cell->info().dtemp() = cell->info().temp() - oldTemp;
+        }
 	}
 }
 

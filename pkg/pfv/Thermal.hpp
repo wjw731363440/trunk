@@ -50,12 +50,17 @@ class ThermalState: public State {
 		YADE_CLASS_BASE_DOC_ATTRS_INIT_CTOR_PY(ThermalState,State,"preliminary",
 		/*attributes*/
 		((Real,temp,0,,"temperature of the body"))
+		((bool,oldTempSet,false,,"flag to determine which integration method to use"))
+		((Real,tempHold,0,,"holds temperature for 2nd order difference"))
 		((Real,oldTemp,0,,"change of temp (for thermal expansion)"))
+		((Real,stepFlux,0,,"flux during current step"))
+		((Real,capVol,0,,"total overlapping volume"))
 		((Real,U,0,,"internal energy of the body"))
 		((Real,Cp,0,,"internal energy of the body"))
 		((Real,k,0,,"thermal conductivity of the body"))
 		((Real,alpha,0,,"coefficient of thermal expansion"))
 		((bool,Tcondition,false,,"indicates if particle is assigned dirichlet (constant temp) condition"))
+		((int,boundaryId,-1,,"identifies if a particle is associated with constant temperature thrermal boundary condition"))
 		,
 		/* extra initializers */
 		,
@@ -81,15 +86,14 @@ class ThermalEngine : public PartialEngine
 		typedef typename VectorCell::iterator		VCellIterator;
 
 	public:
-		double fluidK;
 		Scene* scene;
 		bool energySet; //initialize the internal energy of the particles
 		FlowEngineT* flow;
-		bool boundarySet;
 		
 		virtual ~ThermalEngine();
 		virtual void action();
 		void makeThermalState();
+		void resetBoundaryFluxSums();
 		void setConductionBoundary(FlowEngineT* flow);
 		void thermalExpansion();
 		void initializeInternalEnergy();
@@ -106,11 +110,16 @@ class ThermalEngine : public PartialEngine
 		((bool,thermoMech,true,,"Activates thermoMech"))
 		((vector<bool>, bndCondIsTemperature, vector<bool>(6,false),,"defines the type of boundary condition for each side. True if temperature is imposed, False for no heat-flux. Indices can be retrieved with :yref:`FlowEngine::xmin` and friends."))
 		((vector<double>, thermalBndCondValue, vector<double>(6,0),,"Imposed value of a boundary condition."))
+		((vector<double>, thermalBndFlux, vector<double>(6,0),,"Flux through thermal boundary."))
+		((bool,boundarySet,false,,"set false after changing boundary conditions"))
+		((bool,useKernMethod,false,,"flag to use Kern method for thermal conductivity area calc"))
+        ((Real,fluidBeta,0.0002,,"volumetric temperature coefficient m^3/m^3C, default water, <= 0 deactivates"))
+        ((double, fluidK, 0.650,,"Thermal conductivity of the fluid."))
 		,
 		/* extra initializers */
 		,
 		/* ctor */
-		energySet=false;boundarySet=false;
+		energySet=false;
 		,
 		/* py */
 	)

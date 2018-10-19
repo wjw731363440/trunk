@@ -271,7 +271,6 @@ class TemplateFlowEngine_@TEMPLATE_FLOW_NAME@ : public PartialEngine
 		((double, fluidRho, 1000.,,"Density of fluid (for thermalEngine)."))
 		((double, fluidCp, 4181.3,,"Heat capacity of fluid (for thermalEngine)."))
 		((Real, dt, 0,,"timestep [s]"))
-		((double, fluidK, 0.650,,"Thermal conductivity of the fluid (for thermalEngine)."))
 		((bool,permeabilityMap,false,,"Enable/disable stocking of average permeability scalar in cell infos."))
 		((bool, slipBoundary, true,, "Controls friction condition on lateral walls"))
 		((bool,waveAction, false,, "Allow sinusoidal pressure condition to simulate ocean waves"))
@@ -445,6 +444,7 @@ class FlowCellInfo_@TEMPLATE_FLOW_NAME@ : public CGT::SimpleCellInfo {
 	// Partial surfaces of spheres in the double-tetrahedron linking two voronoi centers. [i][j] is for sphere facet "i" and sphere facetVertices[i][j]. Last component for 1/sum_surfaces in the facet.doInterpolate
 	double solidSurfaces [4][4];
 	double temperature;
+    Real tempVariation;
 	double internalEnergy;
 	bool Tcondition;
 	
@@ -461,7 +461,7 @@ class FlowCellInfo_@TEMPLATE_FLOW_NAME@ : public CGT::SimpleCellInfo {
 		for (int k=0; k<4;k++) for (int l=0; l<3;l++) solidSurfaces[k][l]=0;
 		sphericalVertexSurface.resize(4,0);
 		rayHydr.resize(4, 0);
-		invSumK=index=volumeSign=s=volumeVariation=pression=invVoidV=fict=temperature=0;
+		invSumK=index=volumeSign=s=volumeVariation=pression=invVoidV=fict=temperature=tempVariation=0;
 		isFictious=false; Pcondition = false; isGhost = false; Tcondition= false;
 		isvisited = false;
 		isGhost=false;
@@ -475,6 +475,7 @@ class FlowCellInfo_@TEMPLATE_FLOW_NAME@ : public CGT::SimpleCellInfo {
 	inline const Real& invVoidVolume (void) const {return invVoidV;}
 	inline Real& invVoidVolume (void) {return invVoidV;}
 	inline Real& dv (void) {return volumeVariation;}
+	inline Real& dtemp (void) {return tempVariation;}
 	inline int& fictious (void) {return fict;}
 	inline double& p (void) {return pression;}
 	inline double& temp (void) {return temperature;}
