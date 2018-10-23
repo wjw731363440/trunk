@@ -25,14 +25,14 @@ ThermalEngine::~ThermalEngine(){}
 void ThermalEngine::action()
 {
 	scene = Omega::instance().getScene().get();
-    elapsedTime += scene->dt;
-    if (elapsedIters > conductionIterPeriod || first){
-        runConduction = true;
-        timeStepEstimated = false;
-        if (first) thermalDT = scene->dt;
-        else thermalDT = elapsedTime;
-        first = false;
-    }
+	elapsedTime += scene->dt;
+	if (elapsedIters > conductionIterPeriod || first){
+	        runConduction = true;
+	        timeStepEstimated = false;
+	        if (first) thermalDT = scene->dt;
+	        else thermalDT = elapsedTime;
+	        first = false;
+	}
 	FOREACH(const shared_ptr<Engine> e, Omega::instance().getScene()->engines) {
 		if (e->getClassName() == "FlowEngine") {
 			flow = dynamic_cast<FlowEngineT*>(e.get());
@@ -54,8 +54,8 @@ void ThermalEngine::action()
 	if (conduction && runConduction) computeNewParticleTemperatures();
 	if (advection) computeNewPoreTemperatures();
 	if (thermoMech && runConduction) thermalExpansion();
-    if (!timeStepEstimated) timeStepEstimate();
-    elapsedIters += 1;
+	if (!timeStepEstimated) timeStepEstimate();
+	elapsedIters += 1;
 }
 
 void ThermalEngine::makeThermalState() {
@@ -77,14 +77,13 @@ void ThermalEngine::timeStepEstimate() {
 	}
 	timeStepEstimated = true;
     
-    // estimate the conduction iterperiod based on current mechanical/fluid timestep
-    conductionIterPeriod = int(tsSafetyFactor * maxTimeStep/scene->dt);
-    //cout << "conductionIterPeriod" << conductionIterPeriod << "maxTimeStep "<< maxTimeStep << endl;  // seems like the thermal max DT is estimating values orders of magnitude LOWER than fluid engine...not right. ACtually it works great without advection involved
-    elapsedIters = 0;
-    elapsedTime = 0;
-    timeStepEstimated = true;
-    runConduction = false;
-    
+    	// estimate the conduction iterperiod based on current mechanical/fluid timestep
+   	 conductionIterPeriod = int(tsSafetyFactor * maxTimeStep/scene->dt);
+    	//cout << "conductionIterPeriod" << conductionIterPeriod << "maxTimeStep "<< maxTimeStep << endl;  // seems like the thermal max DT is estimating values orders of magnitude LOWER than fluid engine...not right. ACtually it works great without advection involved
+	elapsedIters = 0;
+	elapsedTime = 0;
+	timeStepEstimated = true;
+	runConduction = false;
 }
 
 void ThermalEngine::resetBoundaryFluxSums() {
@@ -153,7 +152,7 @@ void ThermalEngine::computeSolidFluidFluxes() {
 //	#ifdef YADE_OPENMP
 	const long size = Tes.cellHandles.size();
 //	#pragma omp parallel for num_threads(ompThreads>0 ? ompThreads : 1)
-    for (long i=0; i<size; i++){
+    	for (long i=0; i<size; i++){
 		CellHandle& cell = Tes.cellHandles[i];
 //	#else	
 		if (cell->info().isGhost) continue; // Do we need special cases for fictious cells?
@@ -174,17 +173,17 @@ void ThermalEngine::computeVertexSphericalArea(){
 //	#ifdef YADE_OPENMP
 	const long size = Tes.cellHandles.size();
 //	#pragma omp parallel for num_threads(ompThreads>0 ? ompThreads : 1)
-    for (long i=0; i<size; i++){
+    	for (long i=0; i<size; i++){
 		CellHandle& cell = Tes.cellHandles[i];
 //	#else		
 		if (cell->info().isFictious) continue;
 		VertexHandle W[4];
 		for (int k=0;k<4;k++) W[k] = cell->vertex(k);
-        cell->info().sphericalVertexSurface[0]=flow->solver->fastSphericalTriangleArea(W[0]->point(),W[1]->point().point(),W[2]->point().point(),W[3]->point().point());
-        cell->info().sphericalVertexSurface[1]=flow->solver->fastSphericalTriangleArea(W[1]->point(),W[0]->point().point(),W[2]->point().point(),W[3]->point().point());
-        cell->info().sphericalVertexSurface[2]=flow->solver->fastSphericalTriangleArea(W[2]->point(),W[1]->point().point(),W[0]->point().point(),W[3]->point().point());
-        cell->info().sphericalVertexSurface[3]=flow->solver->fastSphericalTriangleArea(W[3]->point(),W[1]->point().point(),W[2]->point().point(),W[0]->point().point());
-    }
+        	cell->info().sphericalVertexSurface[0]=flow->solver->fastSphericalTriangleArea(W[0]->point(),W[1]->point().point(),W[2]->point().point(),W[3]->point().point());
+       		cell->info().sphericalVertexSurface[1]=flow->solver->fastSphericalTriangleArea(W[1]->point(),W[0]->point().point(),W[2]->point().point(),W[3]->point().point());
+        	cell->info().sphericalVertexSurface[2]=flow->solver->fastSphericalTriangleArea(W[2]->point(),W[1]->point().point(),W[0]->point().point(),W[3]->point().point());
+        	cell->info().sphericalVertexSurface[3]=flow->solver->fastSphericalTriangleArea(W[3]->point(),W[1]->point().point(),W[2]->point().point(),W[0]->point().point());
+   	 }
 	flow->solver->sphericalVertexAreaCalculated=true;
 }
 
@@ -195,7 +194,7 @@ void ThermalEngine::computeFlux(CellHandle& cell,const shared_ptr<Body>& b, cons
 	const double h = 2. * fluidK / (2.*sphere->radius); // heat transfer coeff assuming Re<<1 (stokes flow)
 	//const double areaRatio = surfaceArea/(4.*M_PI*sphere->radius*sphere->radius);
 	const double flux = h*surfaceArea*(cell->info().temp() - thState->temp); // Total surface accounted for through pores, but we also account for conduction area? Unphysical? 
-    if (runConduction) thState->stabilityCoefficient += h*surfaceArea; // for auto time step estimation
+   	if (runConduction) thState->stabilityCoefficient += h*surfaceArea; // for auto time step estimation
 	if (!cell->info().Tcondition) cell->info().internalEnergy -= flux*thermalDT;  //scene->dt;
 	if (!thState->Tcondition) thState->stepFlux += flux;  // thState->U += flux*scene->dt;
 }
@@ -256,9 +255,10 @@ void ThermalEngine::computeSolidSolidFluxes() {
 		// compute the thermal resistance of the pair and the associated flux
 		double thermalResist;
 		if (useKernMethod) {
-            const double numerator = pow((-d+r-R)*(-d-r+R)*(-d+r+R)*(d+r+R),0.5);	
-            const double rc = numerator / (2.*d);
-            thermalResist = 4.*rc / (1./k1 + 1./k2);}//thermalResist = ((k1+k2)/2.)*area/(r1+r2-pd);}
+            		const double numerator = pow((-d+r-R)*(-d-r+R)*(-d+r+R)*(d+r+R),0.5);	
+            		const double rc = numerator / (2.*d);
+            		thermalResist = 4.*rc / (1./k1 + 1./k2);
+		}//thermalResist = ((k1+k2)/2.)*area/(r1+r2-pd);}
 		else {thermalResist = 2.*(k1+k2)*r1*r2 / (r1+r2-pd);}
 		const double fluxij = thermalResist * (T1-T2);
 
@@ -309,11 +309,11 @@ void ThermalEngine::thermalExpansion() {
 		if (b->shape->getClassIndex()!=Sphere::getClassIndexStatic() || !b) continue;
 		Sphere* sphere = dynamic_cast<Sphere*>(b->shape.get());		
 		ThermalState* thState = YADE_CAST<ThermalState*>(b->state.get());
-        if (!thState->Tcondition) {
-            thState->delRadius = thState->alpha * sphere->radius * (thState->temp - thState->oldTemp);
-            sphere->radius += thState->delRadius;
+       		if (!thState->Tcondition) {
+			thState->delRadius = thState->alpha * sphere->radius * (thState->temp - thState->oldTemp);
+			sphere->radius += thState->delRadius;
             //sphere->radius += thState->alpha * sphere->radius * (thState->temp - thState->oldTemp);
-        }
+        	}
 	}
 	
 	// adjust cell pressure
@@ -322,14 +322,14 @@ void ThermalEngine::thermalExpansion() {
 //	#ifdef YADE_OPENMP
 	const long sizeCells = Tes.cellHandles.size();
 //	#pragma omp parallel for num_threads(ompThreads>0 ? ompThreads : 1)
-    for (long i=0; i<sizeCells; i++){
+    	for (long i=0; i<sizeCells; i++){
 		CellHandle& cell = Tes.cellHandles[i];
 //	#else	
 		if (cell->info().isGhost || cell->info().Pcondition || cell->info().Tcondition) continue; // Do we need special cases for fictious cells?
 		Real term1 = 0;
-        Real term2 = 0;
+        	Real term2 = 0;
 		if (solidThermoMech)  term1 = computeCellPressureChangeFromDeltaVolume(cell);
-        if (fluidThermoMech)  term2 = computeCellPressureChangeFromDeltaTemp(cell);
+        	if (fluidThermoMech)  term2 = computeCellPressureChangeFromDeltaTemp(cell);
 		cell->info().p() += term1 + term2;
 //        cell->info().p() += fluidK * ( (1./(1+fluidBeta*(cell->info().dtemp()))) - 1.);
 	}
