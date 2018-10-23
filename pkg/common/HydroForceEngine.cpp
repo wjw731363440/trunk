@@ -396,430 +396,238 @@ void HydroForceEngine::turbulentFluctuationFluidizedBed(){
 // Fluid resolution routine: 1D vertical volume-averaged fluid momentum balance resolution
 void HydroForceEngine::fluidResolution(double tfin,double dt)
 {
-  //Variables declaration
-  int j;
-  double dummy,dn1,ds1,dn2,ds2,dzn,dzs,dzm,alphafp,alphafwn,alphafws,viscof,dz,as,an,ap1;
-  vector<double> sig(nCell,0.0), dsig(nCell-1,0.), beta(nCell,0.), ufn(nCell,0.), wallFriction(nCell,0.),viscoft(nCell,0.),ufnp(nCell,0.),a(nCell,0.),b(nCell,0.),c(nCell,0.),s(nCell,0.),alphaf(nCell,0.),alphas(nCell,0.),us(nCell,0.);
+	//Variables declaration
+	int j;
+	double dummy,dn1,ds1,dn2,ds2,dzn,dzs,dzm,alphafp,alphafwn,alphafws,viscof,dz,as,an,ap1;
+	vector<double> sig(nCell,0.0), dsig(nCell-1,0.), beta(nCell,0.), ufn(nCell,0.), wallFriction(nCell,0.),viscoft(nCell,0.),ufnp(nCell,0.),a(nCell,0.),b(nCell,0.),c(nCell,0.),s(nCell,0.),alphaf(nCell,0.),alphas(nCell,0.),us(nCell,0.);
 
-  //Initialisation
-  double time=0;
-  ufn = vxFluid;	//Assign the global variable vxFluid to ufn, i.e. the last fluid velocity profile evaluated
-  us = vxPart;
-  alphas = phiPart;
-  viscof = viscoDyn/densFluid;  // compute the kinematic viscosity
-  dz = deltaZ;
-  double imp=0.5;  // Implicitation factor of the lateral sink term due to wall friction
-  for (j=0;j<nCell;j++){
-	alphaf[j]=1.-alphas[j];  // compute fluid phase volume fraction or porosity
+	//Initialisation
+	double time=0;
+	ufn = vxFluid;	//Assign the global variable vxFluid to ufn, i.e. the last fluid velocity profile evaluated
+	us = vxPart;
+	alphas = phiPart;
+	viscof = viscoDyn/densFluid;  // compute the kinematic viscosity
+	dz = deltaZ;
+	double imp=0.5;  // Implicitation factor of the lateral sink term due to wall friction
+	for (j=0;j<nCell;j++){
+		alphaf[j]=1.-alphas[j];  // compute fluid phase volume fraction or porosity
 	}
 
-  // Mesh definition: regular with boundary conditions different: 0.5dz at the top, and 1.5dz at the bottom
-  sig[0]=0.; sig[1]=1.5*dz;dsig[0]=1.5*dz;dsig[1]=dz;
-  for (j=2;j<nCell-1;j++) {sig[j]=sig[j-1]+dz; dsig[j]=dz;}
-  sig[nCell-1]= sig[nCell-2]+0.5*dz;dsig[nCell-2]=0.5*dz;
+	// Mesh definition: regular with boundary conditions different: 0.5dz at the top, and 1.5dz at the bottom
+	sig[0]=0.; sig[1]=1.5*dz;dsig[0]=1.5*dz;dsig[1]=dz;
+	for (j=2;j<nCell-1;j++) {sig[j]=sig[j-1]+dz; dsig[j]=dz;}
+	sig[nCell-1]= sig[nCell-2]+0.5*dz;dsig[nCell-2]=0.5*dz;
 
-  sig_cpp.resize(nCell);   dsig_cpp.resize(nCell); 
-  sig_cpp = sig;  dsig_cpp = dsig;
+	sig_cpp.resize(nCell);   dsig_cpp.resize(nCell); 
+	sig_cpp = sig;  dsig_cpp = dsig;
 
-//  ////////////////////////////////////  //  computeTaufsi(dt);
-//  // Compute the fluid-particle momentum transfer associated to drag force, taufsi = phi/Vp*<fd>/rhof/(uf - up), not changing during the fluid resolution
+	////////////////////////////////////  //  computeTaufsi(dt);
+	// Compute the fluid-particle momentum transfer associated to drag force, taufsi = phi/Vp*<fd>/rhof/(uf - up), not changing during the fluid resolution
 
-//  //Initialization
-//  taufsi.resize(nCell);  memset(& taufsi[0],0,nCell);  //Resize and initialize taufsi
-//  double lim = 1e-5, dragTerm=0., partVolume=1., partVolume1=1., partVolume2=1.;
-//  // Evaluate particles volume
-//  if (twoSize==true){
-//	partVolume1 = 4./3.*Mathr::PI*pow(radiusPart1,3);
-//	partVolume2 = 4./3.*Mathr::PI*pow(radiusPart2,3);
-//  }
-//  else 	partVolume = 4./3.*Mathr::PI*pow(radiusPart,3);
-//  // Compute taufsi
-//  taufsi[0] = 0.;
-//  for(int i=1;i<nCell;i++)
-//	{
-//	if (twoSize==true){
-//		dragTerm = phiPart1[i]/partVolume1*averageDrag1[i] + phiPart2[i]/partVolume2*averageDrag2[i];
-//	}
-//	else {
-//		dragTerm = phiPart[i]/partVolume*averageDrag[i];
-//	}
-
-//	double urel = std::abs(ufn[i] - us[i]);
-//	double urel_bound = std::max(urel,lim); //limit the value to avoid division by 0
-//	taufsi[i] = std::max(0.,std::min(dragTerm/urel_bound/densFluid,pow(10*dt,-1.))); //limit the max value of taufsi to the fluid resolution limit, i.e. 1/(10dt) and required positive (charact. time)
-//	}
-//  //////////////////////////////////// 
-      // Compute the viscosity amplification factor profile (due to the presence of particles), beta
-  if (irheolf==0){      // 0 : Viscosite du fluide pur
-	for(j=0;j<nCell;j++)	beta[j]=1.;
-  }
-  else if (irheolf==1){   // 1 : Viscosite d'Einstein
-	for(j=0;j<nCell;j++)	beta[j]=1.+2.5*alphas[j];
-  }
+	//Initialization
+	taufsi.resize(nCell);  memset(& taufsi[0],0,nCell);  //Resize and initialize taufsi
+	double lim = 1e-5, dragTerm=0., partVolume=1., partVolume1=1., partVolume2=1.;
+	// Evaluate particles volume
+	if (twoSize==true){
+		partVolume1 = 4./3.*Mathr::PI*pow(radiusPart1,3);
+		partVolume2 = 4./3.*Mathr::PI*pow(radiusPart2,3);
+	}
+	else 	partVolume = 4./3.*Mathr::PI*pow(radiusPart,3);
+	// Compute taufsi
+	taufsi[0] = 0.;
+	for(int i=1;i<nCell;i++){
+		if (twoSize==true){dragTerm = phiPart1[i]/partVolume1*averageDrag1[i] + phiPart2[i]/partVolume2*averageDrag2[i];}
+		else {dragTerm = phiPart[i]/partVolume*averageDrag[i];}
+		double urel = std::abs(ufn[i] - us[i]);
+		double urel_bound = std::max(urel,lim); //limit the value to avoid division by 0
+		taufsi[i] = std::max(0.,std::min(dragTerm/urel_bound/densFluid,pow(10*dt,-1.))); //limit the max value of taufsi to the fluid resolution limit, i.e. 1/(10dt) and required positive (charact. time)
+		}
+	//////////////////////////////////// 
+	// Compute the viscosity amplification factor profile (due to the presence of particles), beta
+	// 0 : Pure fluid viscosity
+	if (irheolf==0){for(j=0;j<nCell;j++)	beta[j]=1.;}
+	// 1 : Einstein's viscosity
+	else if (irheolf==1){for(j=0;j<nCell;j++)	beta[j]=1.+2.5*alphas[j]; }
   
-  ///////////////////////////////////////////////
-  // FLUID VELOCITY PROFILE RESOLUTION: LOOP OVER TIME (main loop)
-  while (time <= tfin){
-      // Advance time
-      time = time + dt;
+	///////////////////////////////////////////////
+	// FLUID VELOCITY PROFILE RESOLUTION: LOOP OVER TIME (main loop)
+	while (time <= tfin){
+		// Advance time
+		time = time + dt;
 
-      ////////////////////////////////////      calviscotlm(ufn,viscof,viscoft,sig,dsig
-      // Compute the eddy viscosity depth profile, viscoft
+		////////////////////////////////////      calviscotlm(ufn,viscof,viscoft,sig,dsig
+		// Compute the eddy viscosity depth profile, viscoft
 
-      double sum,alphasmid,dudz,ustar;
-      vector<double> lm(nCell,0.);
-      // compute the fluid height
-      double fluidHeight = sig[nCell-1];
-      // Eddy viscosity 
-      if (iturbu==0) {      // 0 : No turbulence
-	for(j=0;j<nCell;j++) viscoft[j]=0.;
-      }
-      else if (iturbu==1) {    // iturbu = 1 : Turbulence activated
-          if (ilm==0){	// ilm = 0 : Prandtl mixing length
-	      lm[0]=0.;
-	      for(j=1;j<nCell;j++) lm[j]=kappa*sig[j];
-          }
-          else if (ilm==1){        // ilm = 1 : Parabolic profile (free surface flows)
-	      lm[0]=0.;
-              for(j=1;j<nCell;j++)  lm[j]=kappa*sig[j]*sqrt(1.-sig[j]/fluidHeight);
-              lm[nCell-1]=0.;
-          }
-          else if (ilm==2){        // ilm = 2 : Li and Sawamoto (1995) integral of concentration profile
-	      sum = 0.;
-	      lm[0]=0.;
-              for(j=1;j<nCell;j++){
-	          alphasmid=std::min(0.5*(alphas[j-1]+alphas[j]),phiMax);
-                  sum=sum+kappa*(phiMax-alphasmid)/phiMax*dsig[j-1];
-                  lm[j]=sum;
-              }
-              lm[nCell-1]=lm[nCell-2];
-          }	// end if ilm
+		double sum,alphasmid,dudz,ustar;
+		vector<double> lm(nCell,0.);
+		// compute the fluid height
+		double fluidHeight = sig[nCell-1];
+		// Eddy viscosity 
+		// 0 : No turbulence
+		if (iturbu==0) {for(j=0;j<nCell;j++) viscoft[j]=0.;}
+		// iturbu = 1 : Turbulence activated
+		else if (iturbu==1) {    
+			// ilm = 0 : Prandtl mixing length
+			if (ilm==0){	
+				lm[0]=0.;
+				for(j=1;j<nCell;j++) lm[j]=kappa*sig[j];
+			}
+        		// ilm = 1 : Parabolic profile (free surface flows)
+			else if (ilm==1){
+				lm[0]=0.;
+				for(j=1;j<nCell;j++)  lm[j]=kappa*sig[j]*sqrt(1.-sig[j]/fluidHeight);
+				lm[nCell-1]=0.;
+				}
+        		// ilm = 2 : Li and Sawamoto (1995) integral of concentration profile
+			else if (ilm==2){
+				sum = 0.;
+				lm[0]=0.;
+				for(j=1;j<nCell;j++){
+					alphasmid=std::min(0.5*(alphas[j-1]+alphas[j]),phiMax);
+					sum=sum+kappa*(phiMax-alphasmid)/phiMax*dsig[j-1];
+					lm[j]=sum;
+				}
+				lm[nCell-1]=lm[nCell-2];
+			}
+			// end if ilm
 
-          // Compute the velocity gradient and the mixing length
-          for(j=1;j<nCell;j++){
-	      dzm = 0.5*(dsig[j]+dsig[j-1]);
-	      dudz=(ufn[j]-ufn[j-1])/dzm;
-	      viscoft[j]=(1.-alphas[j])*pow(lm[j],2)*fabs(dudz);
-          }
-          viscoft[nCell-1]=viscoft[nCell-2];
-          // test on y+ for viscous sublayer
-          ustar = sqrt(fabs(gravity[0])*sig[nCell-1]);
-          if (viscousSubLayer==1){
-  	        for(j=1;j<nCell;j++)  if (sig[j]*ustar/viscof<11.3) viscoft[j]=0.;
-          }
-      }
-      //////////////////////////////////
+			// Compute the velocity gradient and the mixing length
+			for(j=1;j<nCell;j++){
+				dzm = 0.5*(dsig[j]+dsig[j-1]);
+				dudz=(ufn[j]-ufn[j-1])/dzm;
+				viscoft[j]=(1.-alphas[j])*pow(lm[j],2)*fabs(dudz);
+			}
+			viscoft[nCell-1]=viscoft[nCell-2];
+			// test on y+ for viscous sublayer
+			ustar = sqrt(fabs(gravity[0])*sig[nCell-1]);
+			if (viscousSubLayer==1){for(j=1;j<nCell;j++)  if (sig[j]*ustar/viscof<11.3) viscoft[j]=0.;}
+		}
 
-
-      //////////////////////////////////
-      // Compute the lateral wall friction profile, if activated
-      if (fluidWallFriction==true){  //calWallFriction(ufn,channelWidth,viscof,wallFriction);
-	      int  maxiter,q;
-	      double Re, epsilon, ff, ffold,delta;
-	      maxiter = 100;	//Maximum number iteration for the resolution
-	      epsilon = 1e-3;	//Tolerance for the equation resolution
-	      for (j=0;j<nCell;j++){
-		   Re = max(1e-10,fabs(ufn[j])*channelWidth/viscof);
-	    	   ffold=pow(0.32,-2);	//Initial guess of the friction factor
-	     	   delta=1e10;	//Initialize at a random value greater than epsilon
-		   q=0;
-		   while ((delta>=epsilon)&&(q<maxiter)){ //Loop while the required precision is reached or the  maximum iteration number is overpassed
-			   q+=1;
-			   //Graf and Altinakar 1993 formulation of the friction factor
-			   ff = pow(2.*log(Re*sqrt(ffold))+0.32,-2);
-			   delta = fabs(ff-ffold)/ffold;
-			   ffold = ff;
-			   }
-		   if (q==maxiter) ff=0.;
-		   wallFriction[j] = ff;
-	      }
-      }
-      //////////////////////////////////
+      		////////////////////////////////////      end if iturbu
 
 
-      //////////////////////////////////
-      // Compute the system of equation in matricial form (Compute a,b,c,s)
+		//////////////////////////////////
+		// Compute the lateral wall friction profile, if activated
+		if (fluidWallFriction==true){
+			int  maxiter,q;
+			double Re, epsilon, ff, ffold,delta;
+			maxiter = 100;	//Maximum number iteration for the resolution
+			epsilon = 1e-3;	//Tolerance for the equation resolution
+			for (j=0;j<nCell;j++){
+				Re = max(1e-10,fabs(ufn[j])*channelWidth/viscof);
+				ffold=pow(0.32,-2);	//Initial guess of the friction factor
+				delta=1e10;	//Initialize at a random value greater than epsilon
+				q=0;
+				while ((delta>=epsilon)&&(q<maxiter)){ //Loop while the required precision is reached or the  maximum iteration number is overpassed
+					q+=1;
+					//Graf and Altinakar 1993 formulation of the friction factor
+					ff = pow(2.*log(Re*sqrt(ffold))+0.32,-2);
+					delta = fabs(ff-ffold)/ffold;
+					ffold = ff;
+				}
+			if (q==maxiter) ff=0.;
+			wallFriction[j] = ff;
+			}
+		}
+      		////////////////////////////////// end wall friction
 
-      // Bottom boundary condition: (always no-slip)
-      j=0; a[j]=0.; b[j]=1.; c[j]=0.; s[j]=0.;
 
-      // Top boundary condition: (0: no-slip / 1: zero gradient) 
-      j=nCell-1;
-      if (iusl==0){ a[j]=0.;  b[j]=1.; c[j]=0.; }
-      else if (iusl==1){ a[j]=-1.; b[j]=1.; c[j]=0.; }
-      s[j]=0.;       
+		//////////////////////////////////
+		// Compute the system of equation in matricial form (Compute a,b,c,s)
 
-      //Loop over the spatial mesh to determine the matricial coefficient, (a,b,c,s)
-      for(j=1;j<nCell-1;j++)
-	{
-	  // volume fraction interpolation (staggered grid)
-	  alphafp = 0.5*(alphaf[j]+alphaf[j+1]);
-	  if (j==1)
-	    {
-	      alphafwn=0.5*(alphaf[j+2]+alphaf[j+1]); 
-	      alphafws=alphaf[j-1]; 
-	    }
-	  else if (j==nCell-2)
-	    {
-	      alphafwn=alphaf[j+1]; 
-	      alphafws=0.5*(alphaf[j  ]+alphaf[j-1]);
-	    }
-	  else
-	    {
-	      alphafwn=0.5*(alphaf[j+2]+alphaf[j+1]); 
-	      alphafws=0.5*(alphaf[j  ]+alphaf[j-1]);
-	    }
-	  dzn = dsig[j];
-	  dzs = dsig[j-1];
-	  dzm = 0.5*(dzn+dzs);
+		// Bottom boundary condition: (always no-slip)
+		j=0; a[j]=0.; b[j]=1.; c[j]=0.; s[j]=0.;
 
-	  // Diffusion coefficients
-	  // Eddy viscosity terms
-	  dummy=dt/dzm;   
-	  ds1=dummy*viscoft[j  ]/dzs;
-	  dn1=dummy*viscoft[j+1]/dzn;
-	  // Viscous terms
-	  ds2=dummy*viscof*beta[j  ]/dzs*alphafp;
-	  dn2=dummy*viscof*beta[j+1]/dzn*alphafp;
+		// Top boundary condition: (0: no-slip / 1: zero gradient) 
+		j=nCell-1;
+		if (iusl==0){ a[j]=0.;  b[j]=1.; c[j]=0.; }
+		else if (iusl==1){ a[j]=-1.; b[j]=1.; c[j]=0.; }
+		s[j]=0.;       
+
+		//Loop over the spatial mesh to determine the matricial coefficient, (a,b,c,s)
+		for(j=1;j<nCell-1;j++){
+			// volume fraction interpolation (staggered grid)
+			alphafp = 0.5*(alphaf[j]+alphaf[j+1]);
+			if (j==1){
+				alphafwn=0.5*(alphaf[j+2]+alphaf[j+1]); 
+				alphafws=alphaf[j-1]; 
+			}
+			else if (j==nCell-2){
+				alphafwn=alphaf[j+1]; 
+				alphafws=0.5*(alphaf[j  ]+alphaf[j-1]);
+			}
+			else{
+				alphafwn=0.5*(alphaf[j+2]+alphaf[j+1]); 
+				alphafws=0.5*(alphaf[j  ]+alphaf[j-1]);
+			}
+			dzn = dsig[j];
+			dzs = dsig[j-1];
+			dzm = 0.5*(dzn+dzs);
+
+			// Diffusion coefficients
+			// Eddy viscosity terms
+			dummy=dt/dzm;   
+			ds1=dummy*viscoft[j  ]/dzs;
+			dn1=dummy*viscoft[j+1]/dzn;
+			// Viscous terms
+			ds2=dummy*viscof*beta[j  ]/dzs*alphafp;
+			dn2=dummy*viscof*beta[j+1]/dzn*alphafp;
 	  
-	  // Numerical scheme coefficient (diffussion only in 1DV)
-	  an=dn1+(dn2)*alphafwn;
-	  as=ds1+(ds2)*alphafws;
-	
-	  ap1=dn1+(dn2)*alphafp+ds1+(ds2)*alphafp;
-	  // LHS: algebraic system coefficients
-	  a[j] = - as;
-	  b[j] = alphafp + ap1 + dt*taufsi[j]  + imp*dt*alphafp*2./channelWidth*0.125*wallFriction[j]*ufn[j]; 
-	  c[j] = - an;
+			// Numerical scheme coefficient (diffussion only in 1DV)
+			an=dn1+(dn2)*alphafwn;
+			as=ds1+(ds2)*alphafws;
+			ap1=dn1+(dn2)*alphafp+ds1+(ds2)*alphafp;
+			// LHS: algebraic system coefficients
+			a[j] = - as;
+			b[j] = alphafp + ap1 + dt*taufsi[j]  + imp*dt*alphafp*2./channelWidth*0.125*wallFriction[j]*ufn[j]; 
+			c[j] = - an;
 
-	  // RHS: unsteady, gravity, drag, pressure gradient, lateral wall friction
-	  s[j]= alphafp*ufn[j] + alphafp*std::abs(gravity[0])*dt + dt*taufsi[j]*us[j] - alphafp*dpdx/densFluid*dt - (1.-imp)*dt*alphafp*2./channelWidth*0.125*wallFriction[j]*pow(ufn[j],2);
-        }
-      //////////////////////////////////
-
+			// RHS: unsteady, gravity, drag, pressure gradient, lateral wall friction
+			s[j]= alphafp*ufn[j] + alphafp*std::abs(gravity[0])*dt + dt*taufsi[j]*us[j] - alphafp*dpdx/densFluid*dt - (1.-imp)*dt*alphafp*2./channelWidth*0.125*wallFriction[j]*pow(ufn[j],2);
+		}
+		//////////////////////////////////
 
 
-      ////////////////////////////////////      doubleq(a, b , c, s , ufnp);
-      // Solve the matricial tridiagonal system using double-sweep algorithm
+		////////////////////////////////////      doubleq(a, b , c, s , ufnp);
+		// Solve the matricial tridiagonal system using double-sweep algorithm
 
-      int i,ii;
-      vector<double> ddem(nCell,0.), ddfm(nCell,0.);
-      double dddiv;
-      // downward sweep
-      dddiv=b[0];
-      ddem[0]=-c[0]/dddiv;
-      ddfm[0]=s[0]/dddiv;
+		int i,ii;
+		vector<double> ddem(nCell,0.), ddfm(nCell,0.);
+		double dddiv;
+		// downward sweep
+		dddiv=b[0];
+		ddem[0]=-c[0]/dddiv;
+		ddfm[0]=s[0]/dddiv;
   
-      for (i=1;i<=nCell-2;i++){
-	     dddiv=b[i]+a[i]*ddem[i-1];
-	     ddem[i]=-c[i]/dddiv;
-	     ddfm[i]=(s[i]-a[i]*ddfm[i-1])/dddiv;
-      }
-      // upward sweep
-      dddiv=b[nCell-1]+a[nCell-1]*ddem[nCell-2];
-      ddfm[nCell-1]=(s[nCell-1]-a[nCell-1]*ddfm[nCell-2])/dddiv;
-      ufnp[nCell-1]=ddfm[nCell-1];
-      for (ii=2;ii<nCell+1;ii++){
-	     i=nCell-ii;
-	     ufnp[i]=ddem[i]*ufnp[i+1]+ddfm[i];
-      }  
-      //////////////////////////////////
+		for (i=1;i<=nCell-2;i++){
+			dddiv=b[i]+a[i]*ddem[i-1];
+			ddem[i]=-c[i]/dddiv;
+			ddfm[i]=(s[i]-a[i]*ddfm[i-1])/dddiv;
+		}
+		// upward sweep
+		dddiv=b[nCell-1]+a[nCell-1]*ddem[nCell-2];
+		ddfm[nCell-1]=(s[nCell-1]-a[nCell-1]*ddfm[nCell-2])/dddiv;
+		ufnp[nCell-1]=ddfm[nCell-1];
+		for (ii=2;ii<nCell+1;ii++){
+			i=nCell-ii;
+			ufnp[i]=ddem[i]*ufnp[i+1]+ddfm[i];
+		}  
+		//////////////////////////////////
 
-      // Update solution for next time step
-      for(j=0;j<nCell;j++) ufn[j]=ufnp[j];
-  }
-  ///////////////////////////// END OF THE LOOP ON THE TIME
+		// Update solution for next time step
+		for(j=0;j<nCell;j++) ufn[j]=ufnp[j];
+	}
+	///////////////////////////// END OF THE LOOP ON THE TIME
 
 
-  //Update Fluid velocity, turbulent viscosity and Reynolds stresses
-  ReynoldStresses.resize(nCell);  turbulentViscosity.resize(nCell);  vxFluid.resize(nCell);
-  memset(& ReynoldStresses[0],0,nCell);  memset(& turbulentViscosity[0],0,nCell);  memset(& vxFluid[0],0,nCell);
-  for (j=0;j<nCell;j++){
-  	vxFluid[j] = ufn[j];  // Update fluid velocity
-	turbulentViscosity[j] = viscoft[j];
-	if (j>0) ReynoldStresses[j] = densFluid*viscoft[j]*(ufn[j+1]-ufn[j])/dsig[j];
-  }
-  ReynoldStresses[nCell-1] = ReynoldStresses[nCell-2];turbulentViscosity[nCell-1]=viscoft[nCell-1];
+	//Update Fluid velocity, turbulent viscosity and Reynolds stresses
+	ReynoldStresses.resize(nCell);  turbulentViscosity.resize(nCell);  vxFluid.resize(nCell);
+	memset(& ReynoldStresses[0],0,nCell);  memset(& turbulentViscosity[0],0,nCell);  memset(& vxFluid[0],0,nCell);
+	for (j=0;j<nCell;j++){
+		vxFluid[j] = ufn[j];  // Update fluid velocity
+		turbulentViscosity[j] = viscoft[j];
+		if (j>0) ReynoldStresses[j] = densFluid*viscoft[j]*(ufn[j+1]-ufn[j])/dsig[j];
+	}
+	ReynoldStresses[nCell-1] = ReynoldStresses[nCell-2];turbulentViscosity[nCell-1]=viscoft[nCell-1];
 }
 ///////////////////////////////////////////////////////////////////////// END OF HydroForceEngine::fluidResolution
-
-
-
-
-
-
-// Compute the effective viscosity accounting for the presence of particles
-void HydroForceEngine::calbeta(vector<double> beta_in)
-{
-  int j;
-  // viscosity amplification factor
-  if (irheolf==0)
-    // 0 : Viscosite du fluide pur
-    {
-      for(j=0;j<=nCell-1;j++)
-	beta_in[j]=1.;
-    }
-  else if (irheolf==1)
-    // 1 : Viscosite d'Einstein
-    {
-      for(j=0;j<=nCell-1;j++)
-	beta_in[j]=1.+2.5*phiPart[j];
-    }
-}
-
-// Compute the eddy viscosity, turbulentViscosity
-void HydroForceEngine::calviscotlm(vector<double> ufn_in,double viscof_in,vector<double> viscoft_in,vector<double> sig_in,vector<double> dsig_in)
-{
-  int j;
-  double lm[nCell],sum,alphasmid,dudz,ustar,dzm;
-  // compute the fluid height
-  double fluidHeight = sig_in[nCell-1];
-
-  // Eddy viscosity 
-  if (iturbu==0)
-    // 0 : No turbulence
-    {
-      for(j=0;j<=nCell-1;j++)
-        viscoft_in[j]=0.;
-    }
-  else if (iturbu==1)
-    // 1 : Turbulence activated
-    {
-      if (ilm==0)
-	// 0 : Prandtl mixing length
-	{
-	  lm[0]=0.;
-	  for(j=1;j<=nCell-1;j++) lm[j]=kappa*sig_in[j];
-	}
-      else if (ilm==1)
-        // 1 : Parabolic profile (free surface flows)
-        {
-	  lm[0]=0.;
-          for(j=1;j<=nCell-1;j++)  lm[j]=kappa*sig_in[j]*sqrt(1.-sig_in[j]/fluidHeight);
-          lm[nCell-1]=0.;
-        }
-      else if (ilm==2)
-        // 2 : Li and Sawamoto (1995) integral of concentration profile
-        {
-	  sum = 0.;
-	  lm[0]=0.;
-          for(j=1;j<=nCell-1;j++)
-            {
-	      alphasmid=std::min(0.5*(phiPart[j-1]+phiPart[j]),phiMax);
-              sum=sum+kappa*(phiMax-alphasmid)/phiMax*dsig_in[j-1];
-              lm[j]=sum;
-            }
-          lm[nCell-1]=lm[nCell-2];
-        }
-      // Compute the velocity gradient and the mixing length
-      for(j=1;j<nCell-1;j++)
-	{
-	  dzm = 0.5*(dsig_in[j]+dsig_in[j-1]);
-	  dudz=(ufn_in[j]-ufn_in[j-1])/dzm;
-	  viscoft_in[j]=(1.-phiPart[j])*pow(lm[j],2)*fabs(dudz);
-        }
-      viscoft_in[nCell-1]=viscoft_in[nCell-2];
-      // test on y+ for viscous sublayer
-      ustar = sqrt(fabs(gravity[0])*sig_in[nCell-1]);
-      if (viscousSubLayer==1){
-	      for(j=1;j<nCell-1;j++)  if (sig_in[j]*ustar/viscof_in<11.3) viscoft_in[j]=0.;
-	}
-          
-    }
-  
-}
-
-//Resolution of tridiagonal system
-void HydroForceEngine::doubleq(vector<double> ddam1,vector<double> ddam2,vector<double> ddam3, vector<double> ddbm,vector<double> ddxm)
-//void HydroForceEngine::doubleq(double ddam1[],double ddam2[],double ddam3[], double ddbm[],double ddxm[])
-{
-  /* reosolution of tridiagonal system
-       am1,2,3[n] - Tridiagonal matrix coefficients                                     
-       bm[n]   - RHS vector        
-       xm[n]   - Solution vector        
-       em[n], fm[n) - working arrays
-       n       - algebraic system size
-  */
-  cout<<"b"<<ddam1[10]<<"  "<<ddam2[10]<<"  "<<ddam3[10]<<"  "<<ddbm[10]<<"  "<<ddxm[10]<<endl;
-  int i,ii;
-  double dddiv;
-  vector<double> ddem(nCell),ddfm(nCell);
-
-  // downward sweep
-  dddiv=ddam2[0];
-  ddem[0]=-ddam3[0]/dddiv;
-  ddfm[0]=ddbm[0]/dddiv;
-  
-  for (i=1;i<=nCell-2;i++)
-    {
-      dddiv=ddam2[i]+ddam1[i]*ddem[i-1];
-      ddem[i]=-ddam3[i]/dddiv;
-      ddfm[i]=(ddbm[i]-ddam1[i]*ddfm[i-1])/dddiv;
-    }
-    // upward sweep
-  dddiv=ddam2[nCell-1]+ddam1[nCell-1]*ddem[nCell-2];
-  ddfm[nCell-1]=(ddbm[nCell-1]-ddam1[nCell-1]*ddfm[nCell-2])/dddiv;
-  ddxm[nCell-1]=ddfm[nCell-1];
-  for (ii=2;ii<=nCell;ii++)
-    {
-      i=nCell-ii;
-      ddxm[i]=ddem[i]*ddxm[i+1]+ddfm[i];
-    }  
-  cout<<"c"<<ddxm[10]<<endl;
-}
-
-//  Create taufsi = dragTerm/(rhof(vf-vxp)) for the fluid resolution
-void HydroForceEngine::computeTaufsi(double dt_in)
-{
-  //Resize and initialize taufsi
-  taufsi.resize(nCell);
-  memset(& taufsi[0],0,nCell);
-
-  //Initialization
-  double lim = 1e-5, dragTerm=0., partVolume=1., partVolume1=1., partVolume2=1.;
-  // Evaluate particles volume
-  if (twoSize==true){
-	partVolume1 = 4./3.*Mathr::PI*pow(radiusPart1,3);
-	partVolume2 = 4./3.*Mathr::PI*pow(radiusPart2,3);
-  }
-  else 	partVolume = 4./3.*Mathr::PI*pow(radiusPart,3);
-  // Compute taufsi
-  taufsi[0] = 0.;
-  for(int i=1;i<nCell;i++)
-	{
-	if (twoSize==true){
-		dragTerm = phiPart1[i]/partVolume1*averageDrag1[i] + phiPart2[i]/partVolume2*averageDrag2[i];
-	}
-	else {
-		dragTerm = phiPart[i]/partVolume*averageDrag[i];
-	}
-
-	double urel = std::abs(vxFluid[i] - vxPart[i]);
-	double urel_bound = std::max(urel,lim); //limit the value to avoid division by 0
-	taufsi[i] = std::max(0.,std::min(dragTerm/urel_bound/densFluid,pow(10*dt_in,-1.))); //limit the max value of taufsi to the fluid resolution limit, i.e. 1/(10dt) and required positive (charact. time)
-	}
-}
-
-//Evaluate the wall friction coefficient at each elevation, solving the Graf & Altinakar 1993 formulation. 
-void HydroForceEngine::calWallFriction(vector<double> ufn_in,double channelWidth_in,double viscof_in,vector<double> wallFriction_in){
-   int  maxiter,q,j;
-   double Re, epsilon, ff, ffold,delta;
-   maxiter = 100;	//Maximum number iteration for the resolution
-   epsilon = 1e-3;	//Tolerance for the equation resolution
-   for (j=0;j<=nCell-1;j++){
-        Re = max(1e-10,fabs(ufn_in[j])*channelWidth_in/viscof_in);
-  	ffold=pow(0.32,-2);	//Initial guess of the friction factor
-     	delta=1e10;	//Initialize at a random value greater than epsilon
-	q=0;
-	while ((delta>=epsilon)&&(q<maxiter)){ //Loop while the required precision is reached or the  maximum iteration number is overpassed
-		q+=1;
-		//Graf and Altinakar 1993 formulation of the friction factor
-		ff = pow(2.*log(Re*sqrt(ffold))+0.32,-2);
-		delta = fabs(ff-ffold)/ffold;
-		ffold = ff;
-		}
-	if (q==maxiter) ff=0.;
-	wallFriction_in[j] = ff;
-   }
-}
-
