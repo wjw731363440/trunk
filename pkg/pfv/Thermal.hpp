@@ -61,6 +61,8 @@ class ThermalState: public State {
 		((Real,alpha,0,,"coefficient of thermal expansion"))
 		((bool,Tcondition,false,,"indicates if particle is assigned dirichlet (constant temp) condition"))
 		((int,boundaryId,-1,,"identifies if a particle is associated with constant temperature thrermal boundary condition"))
+        ((Real,stabilityCoefficient,0,,"sum of solid and fluid thermal resistivities for use in automatic timestep estimation"))
+        ((Real,delRadius,0,,"radius change due to thermal expansion"))
 		,
 		/* extra initializers */
 		,
@@ -89,25 +91,42 @@ class ThermalEngine : public PartialEngine
 		Scene* scene;
 		bool energySet; //initialize the internal energy of the particles
 		FlowEngineT* flow;
+        bool timeStepEstimated;
+        Real thermalDT;
+        bool conductionIter;
+        int elapsedIters;
+        int conductionIterPeriod;
+        Real elapsedTime;
+        bool first;
+        bool runConduction;
+        Real maxTimeStep;
 		
 		virtual ~ThermalEngine();
 		virtual void action();
 		void makeThermalState();
 		void resetBoundaryFluxSums();
-		void setConductionBoundary(FlowEngineT* flow);
+		void setConductionBoundary();
 		void thermalExpansion();
 		void initializeInternalEnergy();
-		void computeSolidFluidFluxes(FlowEngineT* flow);
-		void computeNewTemperatures(FlowEngineT* flow);
-		void computeVertexSphericalArea(FlowEngineT* flow);
+        void computeNewPoreTemperatures();
+        void computeNewParticleTemperatures();
+		void computeSolidFluidFluxes();
+		void computeVertexSphericalArea();
 		void computeFlux(CellHandle& cell, const shared_ptr<Body>& b, const double surfaceArea);
 		void computeSolidSolidFluxes();
-
+        void timeStepEstimate();
+        const Real computeCellPressureChangeFromDeltaTemp(CellHandle& cell);
+        const Real computeCellPressureChangeFromDeltaVolume(CellHandle& cell);
+        Real getThermalDT() {return thermalDT;}
+        int getConductionIterPeriod() {return conductionIterPeriod;}
+        Real getMaxTimeStep() {return maxTimeStep;}
 		YADE_CLASS_BASE_DOC_ATTRS_INIT_CTOR_PY(ThermalEngine,PartialEngine,"preliminary",
 		/*attributes*/
 		((bool,advection,true,,"Activates advection"))
 		((bool,conduction,true,,"Activates conduction"))
 		((bool,thermoMech,true,,"Activates thermoMech"))
+        ((bool,fluidThermoMech,true,,"Activates thermoMech"))
+        ((bool,solidThermoMech,true,,"Activates thermoMech"))
 		((vector<bool>, bndCondIsTemperature, vector<bool>(6,false),,"defines the type of boundary condition for each side. True if temperature is imposed, False for no heat-flux. Indices can be retrieved with :yref:`FlowEngine::xmin` and friends."))
 		((vector<double>, thermalBndCondValue, vector<double>(6,0),,"Imposed value of a boundary condition."))
 		((vector<double>, thermalBndFlux, vector<double>(6,0),,"Flux through thermal boundary."))
@@ -115,13 +134,17 @@ class ThermalEngine : public PartialEngine
 		((bool,useKernMethod,false,,"flag to use Kern method for thermal conductivity area calc"))
         ((Real,fluidBeta,0.0002,,"volumetric temperature coefficient m^3/m^3C, default water, <= 0 deactivates"))
         ((double, fluidK, 0.650,,"Thermal conductivity of the fluid."))
+        ((double, tsSafetyFactor, 0.8,,"Allow user to control the timstep estimate with a safety factor. Default 0.8"))
 		,
 		/* extra initializers */
 		,
 		/* ctor */
-		energySet=false;
+		energySet=false;timeStepEstimated=false;thermalDT=0;elapsedTime=0;first=true;runConduction=false;maxTimeStep=10000;
 		,
 		/* py */
+        .def("getThermalDT",&ThermalEngine::getThermalDT,"let user check estimated thermalDT .")
+        .def("getConductionIterPeriod",&ThermalEngine::getConductionIterPeriod,"let user check estimated conductionIterPeriod .")
+        .def("getMaxTimeStep",&ThermalEngine::getMaxTimeStep,"let user check estimated maxTimeStep.")
 	)
 	DECLARE_LOGGER;
 

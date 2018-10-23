@@ -680,7 +680,7 @@ void FlowBoundingSphereLinSolv<_Tesselation,FlowType>::initializeInternalEnergy(
         RTriangulation& Tri = T[currentTes].Triangulation();
         FiniteCellsIterator cellEnd = Tri.finite_cells_end();
         for (FiniteCellsIterator cell = Tri.finite_cells_begin(); cell != cellEnd; cell++){
-		if (!cell->info().isGhost) cell->info().internalEnergy = fluidCp*fluidRho*cell->info().temp()*cell->info().volume();
+		if (!cell->info().isGhost) cell->info().internalEnergy = fluidCp*fluidRho*cell->info().temp()*(1./cell->info().invVoidVolume()); // cell->info().volume(); //FIXME: Need to consider void volume(1./cell->info().invVoidVolume());
 	}
 }
 
@@ -716,7 +716,7 @@ void FlowBoundingSphereLinSolv<_Tesselation,FlowType>::setNewCellTemps()
     for (FiniteCellsIterator cell = Tri.finite_cells_begin(); cell != cellEnd; cell++){
 		if (!cell->info().Tcondition && !cell->info().isGhost) {
             Real oldTemp = cell->info().temp();
-            cell->info().temp()=cell->info().internalEnergy/(cell->info().volume()*fluidCp*fluidRho);
+            cell->info().temp()=cell->info().internalEnergy/((1./cell->info().invVoidVolume())*fluidCp*fluidRho); //FIXME: invVoidVolume depends on volumeSolidPore() which uses CGAL points only updated each remesh. We need our own volumeSolidPore(). 
             cell->info().dtemp() = cell->info().temp() - oldTemp;
         }
 	}
