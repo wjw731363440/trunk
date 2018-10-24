@@ -33,7 +33,7 @@ class HydroForceEngine: public PartialEngine{
 		((double,deltaZ,,,"Height of the discretization cell."))
 		((double,vCell,,,"Volume of averaging cell"))
 		///  Fluid Resolution parameters
-		((vector<double>,vxFluid,,,"Discretized streamwise fluid velocity depth profile at t"))
+		((vector<double>,vxFluid,vector<double>(1000),,"Discretized streamwise fluid velocity depth profile at t"))
 		((double,densFluid,1000,,"Density of the fluid, by default - density of water"))
 		((double,viscoDyn,1e-3,,"Dynamic viscosity of the fluid, by default - viscosity of water"))
 		((double,radiusPart,0.,,"Reference particle radius"))

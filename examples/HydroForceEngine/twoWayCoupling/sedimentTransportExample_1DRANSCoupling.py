@@ -58,9 +58,9 @@ ndimz = 900	#Number of cells in the height
 dz =  fluidHeight/(1.0*(ndimz-1))	# Fluid discretization step in the wall-normal direction	
 
 # Initialization of the main vectors
-vxFluidPY = np.zeros(ndimz)	# Vertical fluid velocity profile: u^f = u_x^f(z) e_x, with x the streamwise direction and z the wall-normal
-phiPartPY = np.zeros(ndimz)	# Vertical particle volume fraction profile
-vxPartPY = np.zeros(ndimz)	# Vertical average particle velocity profile
+vxFluidPY = np.zeros(ndimz+1)	# Vertical fluid velocity profile: u^f = u_x^f(z) e_x, with x the streamwise direction and z the wall-normal. Fluid velocity defined in between the mesh nodes and at the node at the two boundaries, i.e. at ndimz-1 + 2 location = ndimz+1.
+phiPartPY = np.zeros(ndimz-1)	# Vertical particle volume fraction profile, evaluated in between the cells, i.e. at ndimz-1 locations
+vxPartPY = np.zeros(ndimz-1)	# Vertical average particle velocity profile, evaluated in between the cells, i.e. at ndimz-1 locations
 
 #Geometrical configuration, define useful quantities
 height = 5*fluidHeight	#heigth of the periodic cell, in m (bigger than the fluid height to take into particles jumping above the latter)
@@ -162,7 +162,7 @@ O.run()
 ######								           ######
 def gravityDeposition(lim):
 	if O.time<lim : return
-	else :		
+	else :
 		print('\n Gravity deposition finished, apply fluid forces !\n')
 		newtonIntegr.damping = 0.0	# Set the artificial numerical damping to zero
 	   	gravDepo.dead = True	# Remove the present engine for the following
@@ -174,7 +174,6 @@ def gravityDeposition(lim):
 		fluidRes.dead = False		# Activate the 1D fluid resolution
 		hydroEngine.averageProfile()	#Evaluate the solid volume fraction, velocity and drag, necessary for the fluid resolution. 
 		hydroEngine.fluidResolution(1.,dtFluid)	#Initialize the fluid resolution, run the fluid resolution for 1s
-
 	return
 ###############
 #########################################
