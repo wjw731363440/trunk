@@ -30,7 +30,7 @@ kinematicViscoFluid = 1e-6	#Kinematic fluid viscosity, m^2/s, water
 tfin = 1e3		#Total simulated time, in s
 dtFluid = 2e-1		#Resolution time step, in s
 #Mesh
-ndimz = 10000   #Number of grid cells in the height. Needs to be high in order to solve accurately the viscous sublayer
+ndimz = 50000   #Number of grid cells in the height. Needs to be high in order to solve accurately the viscous sublayer
 dz =  fluidHeight/(1.0*(ndimz-1))	#spatial step between two mesh nodes
 
 # Initialization of the fluid velocity
@@ -63,7 +63,7 @@ dz_ap=1.*kinematicViscoFluid/ustar		# Dimensionless vertical scale unit
 nz=int(round(fluidHeight/dz_ap))		# Number of unit over the fluid depth
 ztrans=11.3	#Vertical position of the transition from the viscous sublayer to the log law, in dimensionless unit z+. Take it classically as 11.3, similarly to the fluid resolution
 utrans=ztrans*ustar	#Fluid velocity transition from the viscous sublayer to the log law, in dimensionless unit z+
-z_analytic=np.linspace(0,1e0,nz)*fluidHeight	#Re-create the vertical scale
+z_analytic=np.linspace(0,1e-1,nz)*fluidHeight	#Re-create the vertical scale
 zplus=z_analytic*ustar/kinematicViscoFluid	#Dimensionless vertical scale
 vxFluid_analytic =np.zeros(nz)	#Initialization
 for i in range(nz):
@@ -79,18 +79,20 @@ from pylab import *
 from matplotlib import pyplot
 import matplotlib.gridspec as gridspec
 
-# Re-create the fluid resolution mesh: regular spacing, with differences at the bottom (0) and at the top (ndimz-2). 
-dsig = np.ones(ndimz-1)*dz
-dsig[0]=1.5*dz
-dsig[-1]=0.5*dz
-sig=np.zeros(ndimz)
-for i in range(1,ndimz):
-	sig[i]=sig[i-1]+dsig[i-1]
+# Re-create the fluid resolution mesh: regular spacing, with differences at the bottom (0) and at the top (ndimz-1). 
+zScale=np.zeros(ndimz+1)
+zScale[0] = 0.
+zScale[1] = 0.5*dz
+for i in range(2,ndimz):
+	zScale[i]=zScale[i-1]+dz
+zScale[ndimz] = zScale[ndimz-1] + 0.5*dz
+
+
 #Figure creation: compare the analytical solution and the fluid resolution
 pyplot.figure(1)
 gs = gridspec.GridSpec(1, 1)
 ax1 = subplot(gs[0,0])
-p1=ax1.plot(vxFluid,sig,'-ob',label='u_f')	#fluid resolution results: in blue points
+p1=ax1.plot(vxFluid,zScale,'-ob',label='u_f')	#fluid resolution results: in blue points
 p2=ax1.semilogy(vxFluid_analytic,z_analytic,'-r',label='u_f^ex')	#Analytical solution: red line
 xlabel('<v_x^f> (m/s)')
 ylabel('z (m)')

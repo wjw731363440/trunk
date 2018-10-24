@@ -398,7 +398,7 @@ void HydroForceEngine::fluidResolution(double tfin,double dt)
 	//Variables declaration
 	int i,j,maxiter,q,ii;
 	double phi_nodej,termeVisco_j, termeVisco_jp1,termeTurb_j,termeTurb_jp1,viscof,dz,sum,phi_lim,dudz,ustar,fluidHeight,urel,urel_bound,Re,eps,ff,ffold,delta,dddiv;
-	vector<double> sig(nCell,0.0), dsig(nCell-1,0.), viscoeff(nCell,0.), ufn(nCell+1,0.), wallFriction(nCell,0.),viscoft(nCell,0.),ufnp(nCell+1,0.),a(nCell+1,0.),b(nCell+1,0.),c(nCell+1,0.),s(nCell+1,0.),lm(nCell,0.),ddem(nCell+1,0.),ddfm(nCell+1,0.),deltaz(nCell,0.),epsilon_node(nCell,0.),epsilon(nCell,0.);
+	vector<double> sig(nCell,0.0), dsig(nCell-1,0.), viscoeff(nCell,0.), ufn(nCell+1,0.), wallFriction(nCell-1,0.),viscoft(nCell,0.),ufnp(nCell+1,0.),a(nCell+1,0.),b(nCell+1,0.),c(nCell+1,0.),s(nCell+1,0.),lm(nCell,0.),ddem(nCell+1,0.),ddfm(nCell+1,0.),deltaz(nCell,0.),epsilon_node(nCell,0.),epsilon(nCell,0.);
 
 	//Initialisation
 	double time=0;
@@ -525,9 +525,9 @@ void HydroForceEngine::fluidResolution(double tfin,double dt)
 		// Compute the lateral wall friction profile, if activated
 		if (fluidWallFriction==true){
 			maxiter = 100;	//Maximum number iteration for the resolution
-			eps = 1e-3;	//Tolerance for the equation resolution
-			for (j=0;j<nCell;j++){
-				Re = max(1e-10,fabs(ufn[j])*channelWidth/viscof);
+			eps = 1e-2;	//Tolerance for the equation resolution
+			for (j=0;j<nCell-1;j++){
+				Re = max(1e-10,fabs(ufn[j+1])*channelWidth/viscof);
 				ffold=pow(0.32,-2);	//Initial guess of the friction factor
 				delta=1e10;	//Initialize at a random value greater than eps
 				q=0;
@@ -539,7 +539,7 @@ void HydroForceEngine::fluidResolution(double tfin,double dt)
 					ffold = ff;
 				}
 			if (q==maxiter) ff=0.;
-			wallFriction[j] = ff;
+			wallFriction[j] = fluidFrictionCoef*ff;
 			}
 		}
       		////////////////////////////////// end wall friction
@@ -571,7 +571,7 @@ void HydroForceEngine::fluidResolution(double tfin,double dt)
 			c[j+1] = - termeVisco_jp1 - termeTurb_jp1;//eq. 26 of the manual Maurin 2018
 
 			// RHS: unsteady, gravity, drag, pressure gradient, lateral wall friction
-			s[j+1]= ufn[j+1]*epsilon[j] + epsilon[j]*dt*std::abs(gravity[0]) + dt*taufsi[j]*vxPart[j] - (1.-imp)*dt*epsilon[j]*2./channelWidth*0.125*wallFriction[j]*pow(ufn[j+1],2) -  epsilon[j]*dpdx*densFluid*dt;//eq. 27 of the manual Maurin 2018 + fluid wall correction and pressure gradient forcing. 
+			s[j+1]= ufn[j+1]*epsilon[j] + epsilon[j]*dt*std::abs(gravity[0]) + dt*taufsi[j]*vxPart[j] - (1.-imp)*dt*epsilon[j]*2./channelWidth*0.125*wallFriction[j]*pow(ufn[j+1],2) -  epsilon[j]*dpdx/densFluid*dt;//eq. 27 of the manual Maurin 2018 + fluid wall correction and pressure gradient forcing. 
 		}
 		//////////////////////////////////
 

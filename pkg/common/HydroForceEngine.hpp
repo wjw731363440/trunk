@@ -47,6 +47,7 @@ class HydroForceEngine: public PartialEngine{
 		((double,kappa,0.41,,"Fluid resolution: Von Karman constant. Can be tuned to account for the effect of particles on the fluid turbulence, see e.g. [RevilBaudard2015]_"))
 		((int,viscousSubLayer,0,,"Fluid resolution: solve the viscous sublayer close to the bottom boundary if set to 1"))
 		((bool,fluidWallFriction,false,,"Fluid resolution: if set to true, introduce a sink term to account for the fluid friction at the wall, see [Maurin2015]_ for details. Requires to set the width of the channel. It might slow down significantly the calculation."))
+		((double,fluidFrictionCoef,1.,,"Fluid resolution: fitting coefficient for the fluid wall friction"))
 		((double,channelWidth,1.,,"Fluid resolution: Channel width for the evaluation of the fluid wall friction inside the fluid resolution."))
 		//// Particle averaged depth profiles
 		((vector<double>,phiPart,,,"Discretized solid volume fraction depth profile. Can be taken as input parameter or evaluated directly inside the engine, calling from python the averageProfile() function"))

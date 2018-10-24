@@ -41,23 +41,22 @@ a.fluidResolution(tfin,dtFluid)# Call the fluid resolution associated with the d
 print "\nFluid Resolution finished !  ","max(vxFluid)=",np.max(a.vxFluid),"\n"
 
 
-
-
 ################################
 # COMPARISON TO THE ANALYTICAL SOLUTION
 print "Comparison to the analytical solution\n"
 vxFluid = np.array(a.vxFluid)
 
-# Re-create the fluid resolution mesh: regular spacing, with differences at the bottom (0) and at the top (ndimz-2). 
-dsig = np.ones(ndimz-1)*dz
-dsig[0]=1.5*dz
-dsig[ndimz-2]=0.5*dz
-sig=np.zeros(ndimz)
-for i in range(1,ndimz):
-	sig[i]=sig[i-1]+dsig[i-1]
+# Re-create the fluid resolution mesh: regular spacing, with differences at the bottom (0) and at the top (ndimz-1). 
+zScale=np.zeros(ndimz+1)
+zScale[0] = 0.
+zScale[1] = 0.5*dz
+for i in range(2,ndimz):
+	zScale[i]=zScale[i-1]+dz
+zScale[ndimz] = zScale[ndimz-1] + 0.5*dz
+
 
 # Analytical solution of the fluid velocity
-upois=-dpdx*1/2./(kinematicViscoFluid*densFluid)*(fluidHeight*sig-sig*sig)
+upois=-dpdx*1/2./(kinematicViscoFluid*densFluid)*(fluidHeight*zScale-zScale*zScale)
 
 
 ## plots
@@ -66,8 +65,8 @@ from matplotlib import pyplot
 import matplotlib.gridspec as gridspec
 figure(1)
 ax1 =subplot(111)
-p1=ax1.plot(vxFluid,sig,'-ob',label='u_f')	#Simulation results = blue points
-p1=ax1.plot(upois,sig,'-r',label='u_f^ex',lw = 2) #Analytical result = red line
+p1=ax1.plot(vxFluid,zScale,'-ob',label='u_f')	#Simulation results = blue points
+p1=ax1.plot(upois,zScale,'-r',label='u_f^ex',lw = 2) #Analytical result = red line
 xlabel('V_x^f (m/s)')
 ylabel('z (m)')
 savefig('figPoiseuille.png')
