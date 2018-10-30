@@ -14,8 +14,8 @@
 #include<pkg/common/Sphere.hpp>
 #include<pkg/dem/Shop.hpp>
  
-YADE_PLUGIN((ThermalState));
-ThermalState::~ThermalState(){};
+//YADE_PLUGIN((ThermalState));
+//ThermalState::~ThermalState(){};
 
 CREATE_LOGGER(ThermalEngine);
 YADE_PLUGIN((ThermalEngine));
@@ -25,6 +25,7 @@ ThermalEngine::~ThermalEngine(){}
 void ThermalEngine::action()
 {
 	scene = Omega::instance().getScene().get();
+	if (first) setInitialValues();	
 	elapsedTime += scene->dt;
 	if (elapsedIters > conductionIterPeriod || first){
 	        runConduction = true;
@@ -33,6 +34,7 @@ void ThermalEngine::action()
 	        else thermalDT = elapsedTime;
 	        first = false;
 	}
+	
 	FOREACH(const shared_ptr<Engine> e, Omega::instance().getScene()->engines) {
 		if (e->getClassName() == "FlowEngine") {
 			flow = dynamic_cast<FlowEngineT*>(e.get());
@@ -51,6 +53,7 @@ void ThermalEngine::action()
 		computeSolidSolidFluxes(); 
 		if (advection) computeSolidFluidFluxes();
 	}
+	
 	if (conduction && runConduction) computeNewParticleTemperatures();
 	if (advection) computeNewPoreTemperatures();
 	if (thermoMech && runConduction) thermalExpansion();
@@ -58,8 +61,18 @@ void ThermalEngine::action()
 	elapsedIters += 1;
 }
 
-void ThermalEngine::makeThermalState() {
-	// loop through bodies and copy information over to new state
+void ThermalEngine::setInitialValues() {
+	const shared_ptr<BodyContainer>& bodies=scene->bodies;
+	const long size=bodies->size();
+	for (long i=0; i<size; i++){
+		const shared_ptr<Body>& b=(*bodies)[i];
+		if (b->shape->getClassIndex()!=Sphere::getClassIndexStatic() || !b) continue;
+		auto* state =b->state.get();
+		state->temp = particleT0;
+		state->k = particleK;
+		state->Cp = particleCp;
+		state->alpha = particleAlpha;
+	}
 }
 
 void ThermalEngine::timeStepEstimate() {
@@ -69,17 +82,15 @@ void ThermalEngine::timeStepEstimate() {
 	for (long i=0; i<size; i++){
 		const shared_ptr<Body>& b=(*bodies)[i];
 		if (b->shape->getClassIndex()!=Sphere::getClassIndexStatic() || !b) continue;
-		ThermalState* thState = YADE_CAST<ThermalState*>(b->state.get());
+		auto* thState = b->state.get();
 		const Real bodyTimeStep = thState->mass * thState->Cp / thState->stabilityCoefficient;
         thState->stabilityCoefficient = 0; // reset the stability coefficient
         if (!maxTimeStep) maxTimeStep = bodyTimeStep;
         if (bodyTimeStep < maxTimeStep) maxTimeStep = bodyTimeStep;
 	}
 	timeStepEstimated = true;
-    
     	// estimate the conduction iterperiod based on current mechanical/fluid timestep
-   	 conductionIterPeriod = int(tsSafetyFactor * maxTimeStep/scene->dt);
-    	//cout << "conductionIterPeriod" << conductionIterPeriod << "maxTimeStep "<< maxTimeStep << endl;  // seems like the thermal max DT is estimating values orders of magnitude LOWER than fluid engine...not right. ACtually it works great without advection involved
+   	conductionIterPeriod = int(tsSafetyFactor * maxTimeStep/scene->dt);
 	elapsedIters = 0;
 	elapsedTime = 0;
 	timeStepEstimated = true;
@@ -98,7 +109,6 @@ void ThermalEngine::setConductionBoundary() {
 	}
 
         RTriangulation& Tri = flow->solver->T[flow->solver->currentTes].Triangulation();
-       // FiniteCellsIterator cellEnd = Tri.finite_cells_end();
 	const shared_ptr<BodyContainer>& bodies=scene->bodies;
         for (int bound=0; bound<6;bound++) {
                 int& id = *flow->solver->boundsIds[bound];
@@ -119,7 +129,7 @@ void ThermalEngine::setConductionBoundary() {
 						const long int id = cell->vertex(v)->info().id();
 						const shared_ptr<Body>& b =(*bodies)[id];
 						if (b->shape->getClassIndex()!=Sphere::getClassIndexStatic() || !b) continue;
-						ThermalState* thState = YADE_CAST<ThermalState*>(b->state.get());
+						auto* thState = b->state.get();
 						thState->Tcondition=true;
 						thState->temp=bi.value;
 						thState->boundaryId=bound;
@@ -139,7 +149,7 @@ void ThermalEngine::initializeInternalEnergy() {
 	for (long i=0; i<size; i++){
 		const shared_ptr<Body>& b=(*bodies)[i];
 		if (b->shape->getClassIndex()!=Sphere::getClassIndexStatic() || !b) continue;
-		ThermalState* thState = YADE_CAST<ThermalState*>(b->state.get());
+		auto* thState = b->state.get();
 		thState->U = thState->Cp*thState->mass*thState->temp;
 	}
 	energySet = true;
@@ -190,13 +200,12 @@ void ThermalEngine::computeVertexSphericalArea(){
 
 void ThermalEngine::computeFlux(CellHandle& cell,const shared_ptr<Body>& b, const double surfaceArea) {
 	const Sphere* sphere = dynamic_cast<Sphere*>(b->shape.get());
-	ThermalState* thState = YADE_CAST<ThermalState*>(b->state.get()); 
+	auto* thState = b->state.get(); 
 	const double h = 2. * fluidK / (2.*sphere->radius); // heat transfer coeff assuming Re<<1 (stokes flow)
-	//const double areaRatio = surfaceArea/(4.*M_PI*sphere->radius*sphere->radius);
-	const double flux = h*surfaceArea*(cell->info().temp() - thState->temp); // Total surface accounted for through pores, but we also account for conduction area? Unphysical? 
+	const double flux = h*surfaceArea*(cell->info().temp() - thState->temp);
    	if (runConduction) thState->stabilityCoefficient += h*surfaceArea; // for auto time step estimation
-	if (!cell->info().Tcondition) cell->info().internalEnergy -= flux*thermalDT;  //scene->dt;
-	if (!thState->Tcondition) thState->stepFlux += flux;  // thState->U += flux*scene->dt;
+	if (!cell->info().Tcondition) cell->info().internalEnergy -= flux*thermalDT; 
+	if (!thState->Tcondition) thState->stepFlux += flux;  
 }
 
 
@@ -212,16 +221,16 @@ void ThermalEngine::computeSolidSolidFluxes() {
 //	#endif
 		const ScGeom* geom;
 		if (!I || !I->geom.get() || !I->phys.get() || !I->isReal()) continue;
-		if (I->geom.get()){
-			geom = YADE_CAST<ScGeom*> (I->geom.get());
-			if (!geom) continue;
-			const double pd = geom->penetrationDepth;
-
+		if (I->geom.get())
+		{
+		geom = YADE_CAST<ScGeom*> (I->geom.get());
+		if (!geom) continue;
+		const double pd = geom->penetrationDepth;
 		const shared_ptr<Body>& b1_=Body::byId(I->getId1(),scene);
 		const shared_ptr<Body>& b2_=Body::byId(I->getId2(),scene);
 		if (b1_->shape->getClassIndex()!=Sphere::getClassIndexStatic() || b2_->shape->getClassIndex()!=Sphere::getClassIndexStatic() || !b1_ || !b2_) continue;
-		ThermalState* thState1 = YADE_CAST<ThermalState*>(b1_->state.get()); 
-		ThermalState* thState2 = YADE_CAST<ThermalState*>(b2_->state.get()); 
+		auto* thState1 = b1_->state.get(); 
+		auto* thState2 = b2_->state.get(); 
 		Sphere* sphere1 = dynamic_cast<Sphere*>(b1_->shape.get());
 		Sphere* sphere2 = dynamic_cast<Sphere*>(b2_->shape.get());
 		
@@ -263,10 +272,10 @@ void ThermalEngine::computeSolidSolidFluxes() {
 		const double fluxij = thermalResist * (T1-T2);
 
 		//cout << "Flux b/w "<< b1_->id << " & "<< b2_->id << " fluxij " << fluxij << endl;
-        if (runConduction){
-            thState1->stabilityCoefficient += thermalResist;
-            thState2->stabilityCoefficient += thermalResist;
-        }
+        	if (runConduction){
+           		thState1->stabilityCoefficient += thermalResist;
+            		thState2->stabilityCoefficient += thermalResist;
+        	}
 		if (!thState1->Tcondition) thState1->stepFlux -= fluxij; //U1 -= fluxij*dt;
 		else thermalBndFlux[thState1->boundaryId] -= fluxij;
 		if (!thState2->Tcondition) thState2->stepFlux += fluxij; // U2 += fluxij*dt;
@@ -286,7 +295,7 @@ void ThermalEngine::computeNewParticleTemperatures() {
     for (long i=0; i<size; i++){
         const shared_ptr<Body>& b=(*bodies)[i];
         if (b->shape->getClassIndex()!=Sphere::getClassIndexStatic() || !b) continue;
-        ThermalState* thState = YADE_CAST<ThermalState*>(b->state.get());
+        auto* thState = b->state.get();
         Sphere* sphere = dynamic_cast<Sphere*>(b->shape.get());
         const double density = b->material->density;
         const double volume = 4./3. * M_PI *pow(sphere->radius,3); // - thState->capVol;
@@ -302,13 +311,12 @@ void ThermalEngine::computeNewParticleTemperatures() {
 void ThermalEngine::thermalExpansion() {
 	const shared_ptr<BodyContainer>& bodies=scene->bodies;
 	const long size=bodies->size();
-
-    // adjust particle size
+	// adjust particle size
 	for (long i=0; i<size; i++){
 		const shared_ptr<Body> b=(*bodies)[i];
 		if (b->shape->getClassIndex()!=Sphere::getClassIndexStatic() || !b) continue;
 		Sphere* sphere = dynamic_cast<Sphere*>(b->shape.get());		
-		ThermalState* thState = YADE_CAST<ThermalState*>(b->state.get());
+		auto* thState = b->state.get();
        		if (!thState->Tcondition) {
 			thState->delRadius = thState->alpha * sphere->radius * (thState->temp - thState->oldTemp);
 			sphere->radius += thState->delRadius;
@@ -318,7 +326,7 @@ void ThermalEngine::thermalExpansion() {
 	
 	// adjust cell pressure
 	if (fluidBeta <= 0) return;
-    Tesselation& Tes = flow->solver->T[flow->solver->currentTes];
+   	Tesselation& Tes = flow->solver->T[flow->solver->currentTes];
 //	#ifdef YADE_OPENMP
 	const long sizeCells = Tes.cellHandles.size();
 //	#pragma omp parallel for num_threads(ompThreads>0 ? ompThreads : 1)
@@ -348,7 +356,7 @@ const Real ThermalEngine::computeCellPressureChangeFromDeltaVolume(CellHandle& c
         const shared_ptr<Body>& b =(*bodies)[id];
         if (b->shape->getClassIndex()!=Sphere::getClassIndexStatic() || !b) continue;
         Sphere* sphere = dynamic_cast<Sphere*>(b->shape.get());	
-        ThermalState* thState = YADE_CAST<ThermalState*>(b->state.get());
+        auto* thState = b->state.get();
         const double surfaceArea = cell->info().sphericalVertexSurface[v]; // from last fluid engine remesh. We could store this in cell->info() if it becomes a burden
         const Real rCubedDiff = pow(sphere->radius,3) - pow(sphere->radius - thState->delRadius,3);
         const double areaTot = 4. * M_PI * pow(sphere->radius,2); // We could store this in cell->info() if it becomes a burden

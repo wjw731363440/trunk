@@ -13,6 +13,7 @@
 
 #include<core/PartialEngine.hpp>
 #include<core/State.hpp>
+#include<pkg/dem/JointedCohesiveFrictionalPM.hpp>
 #include<pkg/dem/ScGeom.hpp>
 #include<pkg/common/Dispatching.hpp>
 
@@ -24,56 +25,6 @@
 #include<pkg/dem/TesselationWrapper.hpp>
 #include<lib/triangulation/Network.hpp>
 #endif
-
-// This is how to turn a body thermal without data loss. Should be done in a loop by a single function, ofc.
-// Yade [10]: s=sphere((0,0,1),100)
-// Yade [11]: s.state.vel=(3,3,3)
-// Yade [12]: thState = ThermalState()
-// Yade [13]: thState.updateAttrs(s.state.dict())
-// Yade [14]: s.state=thState
-// Yade [15]: s.state.tmp
-//  ->  [15]: 0.0
-// Yade [16]: s.state.vel
-//  ->  [16]: Vector3(3,3,3)
-
-// Shorter yet strictly equivalent
-// Yade [21]: s.state=ThermalState().__setstate__( s.state.__getstate__())
-
-
-class ThermalState: public State {
-	public:
-		virtual ~ThermalState();
-		// State is declared boost::noncopyable, so copy constructor seems nearly impossible. The solution is to update inherited attributes using python as show in preamble
-// 		ThermalState& operator= (const State& source) : State(source) {};//FIXME Thermal.cpp:9:33: error: use of deleted function ‘State& State::operator=(const State&)’
-
-		
-		YADE_CLASS_BASE_DOC_ATTRS_INIT_CTOR_PY(ThermalState,State,"preliminary",
-		/*attributes*/
-		((Real,temp,0,,"temperature of the body"))
-		((bool,oldTempSet,false,,"flag to determine which integration method to use"))
-		((Real,tempHold,0,,"holds temperature for 2nd order difference"))
-		((Real,oldTemp,0,,"change of temp (for thermal expansion)"))
-		((Real,stepFlux,0,,"flux during current step"))
-		((Real,capVol,0,,"total overlapping volume"))
-		((Real,U,0,,"internal energy of the body"))
-		((Real,Cp,0,,"internal energy of the body"))
-		((Real,k,0,,"thermal conductivity of the body"))
-		((Real,alpha,0,,"coefficient of thermal expansion"))
-		((bool,Tcondition,false,,"indicates if particle is assigned dirichlet (constant temp) condition"))
-		((int,boundaryId,-1,,"identifies if a particle is associated with constant temperature thrermal boundary condition"))
-        	((Real,stabilityCoefficient,0,,"sum of solid and fluid thermal resistivities for use in automatic timestep estimation"))
-        	((Real,delRadius,0,,"radius change due to thermal expansion"))
-		,
-		/* extra initializers */
-		,
-		/* ctor */ createIndex();
-		,
-		/* py */
-	);
-	REGISTER_CLASS_INDEX(ThermalState,State);
-};
-
-REGISTER_SERIALIZABLE(ThermalState);
 
 class ThermalEngine : public PartialEngine
 {
@@ -103,7 +54,7 @@ class ThermalEngine : public PartialEngine
 		
 		virtual ~ThermalEngine();
 		virtual void action();
-		void makeThermalState();
+		void setInitialValues();
 		void resetBoundaryFluxSums();
 		void setConductionBoundary();
 		void thermalExpansion();
@@ -123,6 +74,7 @@ class ThermalEngine : public PartialEngine
 		YADE_CLASS_BASE_DOC_ATTRS_INIT_CTOR_PY(ThermalEngine,PartialEngine,"preliminary",
 		/*attributes*/
 		((bool,advection,true,,"Activates advection"))
+		((bool,debug,false,,"debugging flags"))
 		((bool,conduction,true,,"Activates conduction"))
 		((bool,thermoMech,true,,"Activates thermoMech"))
         	((bool,fluidThermoMech,true,,"Activates thermoMech"))
@@ -133,6 +85,10 @@ class ThermalEngine : public PartialEngine
 		((bool,boundarySet,false,,"set false after changing boundary conditions"))
 		((bool,useKernMethod,false,,"flag to use Kern method for thermal conductivity area calc"))
         	((Real,fluidBeta,0.0002,,"volumetric temperature coefficient m^3/m^3C, default water, <= 0 deactivates"))
+        	((Real,particleT0,0,,"Initial temperature of particles"))
+		((Real,particleK,3.0,,"Particle thermal conductivity (W/(mK)"))
+		((Real,particleCp,750.,,"Particle thermal heat capacity (J/(kgK)"))
+		((Real,particleAlpha,11.6e-6,,"Particle volumetric thermal expansion coeffcient"))
         	((double, fluidK, 0.650,,"Thermal conductivity of the fluid."))
         	((double, tsSafetyFactor, 0.8,,"Allow user to control the timstep estimate with a safety factor. Default 0.8"))
 		,

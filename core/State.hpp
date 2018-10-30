@@ -67,6 +67,22 @@ class State: public Serializable, public Indexable{
 #ifdef YADE_DEFORM
 		((Real,dR, 0.0,,   "Sphere deformation"))
 #endif
+#ifdef THERMAL
+		((Real,temp,0,,"temperature of the body"))
+		((bool,oldTempSet,false,,"flag to determine which integration method to use"))
+		((Real,tempHold,0,,"holds temperature for 2nd order difference"))
+		((Real,oldTemp,0,,"change of temp (for thermal expansion)"))
+		((Real,stepFlux,0,,"flux during current step"))
+		((Real,capVol,0,,"total overlapping volume"))
+		((Real,U,0,,"internal energy of the body"))
+		((Real,Cp,0,,"internal energy of the body"))
+		((Real,k,0,,"thermal conductivity of the body"))
+		((Real,alpha,0,,"coefficient of thermal expansion"))
+		((bool,Tcondition,false,,"indicates if particle is assigned dirichlet (constant temp) condition"))
+		((int,boundaryId,-1,,"identifies if a particle is associated with constant temperature thrermal boundary condition"))
+        	((Real,stabilityCoefficient,0,,"sum of solid and fluid thermal resistivities for use in automatic timestep estimation"))
+        	((Real,delRadius,0,,"radius change due to thermal expansion"))
+#endif
 		,
 		/* additional initializers */
 			((pos,se3.position))

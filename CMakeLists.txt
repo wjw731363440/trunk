@@ -148,7 +148,8 @@ OPTION(ENABLE_OAR "Generate script for oar-based task scheduler" OFF)
 OPTION(USE_QT5 "USE Qt5 for GUI" ON)
 OPTION(ENABLE_POTENTIAL_BLOCKS "Enable PotentialBlocks" OFF)
 OPTION(ENABLE_DEFORM "Enable Deformation Engine" OFF)
-OPTION(CHOLMOD_GPU "Enable GPU acceleration flow engine direct solver (experimental)" OFF)
+OPTION(CHOLMOD_GPU "Enable GPU acceleration flow engine direct solver" OFF)
+OPTION(ENABLE_THERMAL "Enable thermal engine (experimental)" OFF)
 
 #===========================================================
 # Use Eigen3 by default
@@ -441,6 +442,13 @@ ELSE(ENABLE_MASK_ARBITRARY)
 ENDIF(ENABLE_MASK_ARBITRARY)
 
 #===========================================================
+
+IF(ENABLE_THERMAL)
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DTHERMAL")
+  SET(CONFIGURED_FEATS "${CONFIGURED_FEATS} THERMAL")
+ELSE(ENABLE_THERMAL)
+  SET(DISABLED_FEATS "${DISABLED_FEATS} THERMAL")
+ENDIF(ENABLE_THERMAL)
 
 IF(ENABLE_PROFILING)
   SET(CONFIGURED_FEATS "${CONFIGURED_FEATS} PROFILING")

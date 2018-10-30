@@ -606,7 +606,7 @@ void VTKRecorder::action(){
 				if (recActive[REC_MASS]) spheresMass->InsertNextValue(b->state->mass);
 			#ifdef THERMAL
 				if (recActive[REC_TEMP]) {
-					ThermalState* thState = YADE_CAST<ThermalState*>(b->state.get());
+					auto* thState = b->state.get();
 					spheresTemp->InsertNextValue(thState->temp);
 				}
 			#endif
