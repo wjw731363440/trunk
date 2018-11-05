@@ -44,6 +44,7 @@ void Ip2_ElectrostaticMat_ElectrostaticMat_ElectrostaticPhys::go(const shared_pt
 	phys->A = std::sqrt(mat1->A*mat2->A);
 	phys->DebyeLength = DebyeLength;
 	phys->Z = Z;
+	phys->vdw_cutoff = vdw_cutoff;
 }
 CREATE_LOGGER(Ip2_ElectrostaticMat_ElectrostaticMat_ElectrostaticPhys);
 
@@ -65,13 +66,16 @@ Real Law2_ScGeom_ElectrostaticPhys::normalForce_DLVO_Adim(ElectrostaticPhys* phy
 	Real d;
 	
 	if(dicho)
-		d= DLVO_DichoAdimExp_integrate_u(-geom->penetrationDepth/a, 2.*phys->eps, 1.0, phys->A/(6.*phys->kn*a*a), phys->Z/(phys->kn*a), a/phys->DebyeLength, phys->prevDotU, scene->dt*a*phys->kn/phys->nun, phys->delta, phys->nun/phys->kn/std::pow(a,2)*undot); // Solution by dichotomy
+		d= DLVO_DichoAdimExp_integrate_u(-geom->penetrationDepth/a, 2.*phys->eps, 1.0, phys->A/(6.*phys->kn*a*a), phys->vdw_cutoff, phys->Z/(phys->kn*a), a/phys->DebyeLength, phys->prevDotU, scene->dt*a*phys->kn/phys->nun, phys->delta, phys->nun/phys->kn/std::pow(a,2)*undot); // Solution by dichotomy
 	else
-		d= DLVO_NRAdimExp_integrate_u(-geom->penetrationDepth/a, 2.*phys->eps, 1.0, phys->A/(6.*phys->kn*a*a), phys->Z/(phys->kn*a), a/phys->DebyeLength, phys->prevDotU, scene->dt*a*phys->kn/phys->nun, phys->delta, phys->nun/phys->kn/std::pow(a,2)*undot); // Dimentionless-exponential resolution!!
+		d= DLVO_NRAdimExp_integrate_u(-geom->penetrationDepth/a, 2.*phys->eps, 1.0, phys->A/(6.*phys->kn*a*a), phys->vdw_cutoff, phys->Z/(phys->kn*a), a/phys->DebyeLength, phys->prevDotU, scene->dt*a*phys->kn/phys->nun, phys->delta, phys->nun/phys->kn/std::pow(a,2)*undot); // Dimentionless-exponential resolution!!
 	
 	phys->normalForce = phys->kn*(-geom->penetrationDepth-a*std::exp(d))*geom->normal;
 	phys->normalContactForce = (phys->nun > 0.) ? Vector3r(-phys->kn*(std::max(2.*a*phys->eps-a*std::exp(d),0.))*geom->normal) : phys->normalForce;
-	phys->normalDLVOForce = (phys->A/a/6.*std::exp(-2.*d) - phys->Z*a/phys->DebyeLength*std::exp(-a*std::exp(d)/phys->DebyeLength))*geom->normal;
+	
+	Real u_vdw = (std::exp(d) < phys->vdw_cutoff) ? 1./(phys->vdw_cutoff*phys->vdw_cutoff) : std::exp(-2.*d);
+	
+	phys->normalDLVOForce = (phys->A/(6.*a)*u_vdw - phys->Z*a/phys->DebyeLength*std::exp(-a*std::exp(d)/phys->DebyeLength))*geom->normal;
 	phys->normalLubricationForce = phys->kn*a*phys->prevDotU*geom->normal;
 	
 	phys->delta = d;
@@ -83,7 +87,7 @@ Real Law2_ScGeom_ElectrostaticPhys::normalForce_DLVO_Adim(ElectrostaticPhys* phy
 	return phys->u;
 }
 
-Real Law2_ScGeom_ElectrostaticPhys::DLVO_NRAdimExp_integrate_u(Real const& un, Real const& eps, Real const& alpha, Real const& A, Real const& Z, Real const& K, Real & prevDotU, Real const& dt, Real const& prev_d, Real const& undot, int depth)
+Real Law2_ScGeom_ElectrostaticPhys::DLVO_NRAdimExp_integrate_u(Real const& un, Real const& eps, Real const& alpha, Real const& A, Real const& vdwc, Real const& Z, Real const& K, Real & prevDotU, Real const& dt, Real const& prev_d, Real const& undot, int depth)
 {
 	Real d = prev_d;
 	
@@ -120,12 +124,12 @@ Real Law2_ScGeom_ElectrostaticPhys::DLVO_NRAdimExp_integrate_u(Real const& un, R
 	} else {
 		// Substepping
 		if(debug) LOG_WARN("Substepping: F=" << F << " d=" << d << " d_prev=" << prev_d << " un=" << un << " a=" << a << " K=" << K << " Z=" << Z << " eps=" << eps << " dt=" << dt);
-		Real d_mid = DLVO_NRAdimExp_integrate_u(un, eps, alpha, A, Z, K, prevDotU, dt/2., prev_d, undot, depth+1);
-		return DLVO_NRAdimExp_integrate_u(un, eps, alpha, A, Z, K, prevDotU, dt/2., d_mid, undot, depth+1);
+		Real d_mid = DLVO_NRAdimExp_integrate_u(un, eps, alpha, A, vdwc, Z, K, prevDotU, dt/2., prev_d, undot, depth+1);
+		return DLVO_NRAdimExp_integrate_u(un, eps, alpha, A, vdwc, Z, K, prevDotU, dt/2., d_mid, undot, depth+1);
 	}
 }
 
-Real Law2_ScGeom_ElectrostaticPhys::DLVO_DichoAdimExp_integrate_u(Real const& un, Real const& eps, Real const& alpha, Real const& A, Real const& Z, Real const& K, Real & prevDotU, Real const& dt, Real const& prev_d, Real const& undot)
+Real Law2_ScGeom_ElectrostaticPhys::DLVO_DichoAdimExp_integrate_u(Real const& un, Real const& eps, Real const& alpha, Real const& A, Real const& vdwc, Real const& Z, Real const& K, Real & prevDotU, Real const& dt, Real const& prev_d, Real const& undot)
 {
 	Real F = 0.;
 	Real d_left(prev_d), d_right(prev_d), F_left(F), F_right(F);
@@ -136,8 +140,8 @@ Real Law2_ScGeom_ElectrostaticPhys::DLVO_DichoAdimExp_integrate_u(Real const& un
 	{
 		d_left--;
 		d_right++;
-		F_left = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, A, Z, K, d_left);
-		F_right = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, A, Z, K, d_right);
+		F_left = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, A, vdwc, Z, K, d_left);
+		F_right = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, A, vdwc, Z, K, d_right);
 	}
 	
 	// Iterate to find the zero.
@@ -148,7 +152,7 @@ Real Law2_ScGeom_ElectrostaticPhys::DLVO_DichoAdimExp_integrate_u(Real const& un
 			LOG_ERROR("Both function have same sign!! d_left=" << d_left << " F_left=" << F_left << " d_right=" << d_right << " F_right=" << F_right);
 		
 		d = (d_left + d_right)/2.;	
-		F = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, A, Z, K, d);
+		F = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, A, vdwc, Z, K, d);
 		
 		if(std::abs(F) < SolutionTol)
 			break;
@@ -169,16 +173,18 @@ Real Law2_ScGeom_ElectrostaticPhys::DLVO_DichoAdimExp_integrate_u(Real const& un
 		LOG_WARN("Max iteration reach: d_left=" << d_left << " F_left=" << F_left << " d_right=" << d_right << " F_right=" << F_right);
 	
 	Real a = (std::exp(d) < eps) ? alpha : 0.;
-	prevDotU = -(1.+a)*std::exp(d) + a*eps + un + Z*K*std::exp(-K*std::exp(d));
+	Real u_vdw = (std::exp(d) < vdwc) ? 1./(vdwc*vdwc) : std::exp(-2.*d);
+	prevDotU = -(1.+a)*std::exp(d) + a*eps + un + Z*K*std::exp(-K*std::exp(d)) - A*u_vdw;
 	
 	return d;
 }
 
-Real Law2_ScGeom_ElectrostaticPhys::ObjF(Real const& un, Real const& eps, Real const& alpha, Real const& prevDotU, Real const& dt, Real const& prev_d, Real const& undot, Real const& A, Real const& Z, Real const& K, Real const& d)
+Real Law2_ScGeom_ElectrostaticPhys::ObjF(Real const& un, Real const& eps, Real const& alpha, Real const& prevDotU, Real const& dt, Real const& prev_d, Real const& undot, Real const& A, Real const& vdwc, Real const& Z, Real const& K, Real const& d)
 {
 	Real a = (std::exp(d) < eps) ? alpha : 0.;
+	Real u_vdw = (std::exp(d) < vdwc) ? 1./(vdwc*vdwc) : std::exp(-2.*d);
 	
-	return theta*(un - std::exp(d)*(1.+a) + a*eps + K*Z*std::exp(-K*std::exp(d))) + (1.-theta)*prevDotU*std::exp(prev_d-d) - 1./dt*(1.-std::exp(prev_d-d));
+	return theta*(un - std::exp(d)*(1.+a) + a*eps + K*Z*std::exp(-K*std::exp(d)) - A*u_vdw) + (1.-theta)*prevDotU*std::exp(prev_d-d) - 1./dt*(1.-std::exp(prev_d-d));
 }
 
 bool Law2_ScGeom_ElectrostaticPhys::go(shared_ptr<IGeom>& iGeom, shared_ptr<IPhys>& iPhys, Interaction* interaction)

@@ -34,6 +34,7 @@ class ElectrostaticPhys: public LubricationPhys {
                         ((Real,DebyeLength,1e-6,,"Debye Length $\\kappa^{-1}$[m]"))
                         ((Real,Z,1e-12,,"Double layer interaction constant $Z$ [N]"))
                         ((Real,A,1e-19,,"Hamaker constant $A = \\sqrt{A_1A_2}$ [J]"))
+						((Real,vdw_cutoff, 1.e-4,,"Van der Waals cutoff ratio []"))
 						((Vector3r,normalDLVOForce,Vector3r::Zero(),,"Normal force due to DLVO interaction"))
 			, // ctors
                         createIndex();,
@@ -53,6 +54,7 @@ class Ip2_ElectrostaticMat_ElectrostaticMat_ElectrostaticPhys: public Ip2_FrictM
                 YADE_CLASS_BASE_DOC_ATTRS_CTOR_PY(Ip2_ElectrostaticMat_ElectrostaticMat_ElectrostaticPhys, Ip2_FrictMat_FrictMat_LubricationPhys,"Ip2 creating Electrostatic_Phys from two ElectrostaticMat instances.",
                         ((Real,DebyeLength,1.e-6,,"Debye length [m]."))
                         ((Real,Z,1.e-12,,"Interaction constant [N]."))
+						((Real,vdw_cutoff, 1.e-4,,"Van der Waals cutoff ratio []"))
                     ,,
 					.def("getInteractionConstant", &getInteractionConstant, (py::args("epsr")=78,py::args("T")=293,py::args("z")=1,py::args("phi0")=0.050),"Get the interaction constant from thermal properties").staticmethod("getInteractionConstant")
 		);
@@ -64,10 +66,10 @@ REGISTER_SERIALIZABLE(Ip2_ElectrostaticMat_ElectrostaticMat_ElectrostaticPhys);
 class Law2_ScGeom_ElectrostaticPhys: public Law2_ScGeom_ImplicitLubricationPhys{
 	public:
 		Real normalForce_DLVO_Adim(ElectrostaticPhys *phys, ScGeom* geom, Real const& undot, bool isNew, bool dichotomie);
-		Real DLVO_NRAdimExp_integrate_u(Real const& un, Real const& eps, Real const& alpha, Real const& A, Real const& Z, Real const& K, Real & prevDotU, Real const& dt, Real const& prev_d, Real const& undot, int depth=1);
+		Real DLVO_NRAdimExp_integrate_u(Real const& un, Real const& eps, Real const& alpha, Real const& A, Real const& vdwcut, Real const& Z, Real const& K, Real & prevDotU, Real const& dt, Real const& prev_d, Real const& undot, int depth=1);
 		
-		Real DLVO_DichoAdimExp_integrate_u(Real const& un, Real const& eps, Real const& alpha, Real const& A, Real const& Z, Real const& K, Real & prevDotU, Real const& dt, Real const& prev_d, Real const& undot);
-		Real ObjF(Real const& un, Real const& eps, Real const& alpha, Real const& prevDotU, Real const& dt, Real const& prev_d, Real const& undot, Real const& A, Real const& Z, Real const& K, Real const& d);
+		Real DLVO_DichoAdimExp_integrate_u(Real const& un, Real const& eps, Real const& alpha, Real const& A, Real const& vdwcut, Real const& Z, Real const& K, Real & prevDotU, Real const& dt, Real const& prev_d, Real const& undot);
+		Real ObjF(Real const& un, Real const& eps, Real const& alpha, Real const& prevDotU, Real const& dt, Real const& prev_d, Real const& undot, Real const& A, Real const& vdwcut, Real const& Z, Real const& K, Real const& d);
 		
 		static void getStressForEachBody(vector<Matrix3r>& DLVOStresses);
 		static py::tuple PyGetStressForEachBody();
