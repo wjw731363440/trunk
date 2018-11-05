@@ -978,3 +978,6 @@ py::tuple Shop::getStressAndTangent(Real volume, bool symmetry){
 	tangent/=volume;
 	return py::make_tuple(stress,tangent);
 }
+
+bool Shop::isInBB(Vector3r p, Vector3r bbMin, Vector3r bbMax){return p[0]>bbMin[0] && p[0]<bbMax[0] && p[1]>bbMin[1] && p[1]<bbMax[1] && p[2]>bbMin[2] && p[2]<bbMax[2];}
+

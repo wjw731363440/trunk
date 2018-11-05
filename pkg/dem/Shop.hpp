@@ -169,5 +169,8 @@ class Shop{
 		static Real getVoidRatio2D(const shared_ptr<Scene>& rb=shared_ptr<Scene>(),Real zlen=1);
 		//! get stress tensor and tangent operator tensor for FEMxDEM coupling. By Ning Guo
 		static py::tuple getStressAndTangent(Real volume=0, bool symmetry=true);
+		
+		//! tests whether p lies in the (bbMin,bbMax) axis-aligned bounding box
+		static bool isInBB(Vector3r p, Vector3r bbMin, Vector3r bbMax);
 };
 

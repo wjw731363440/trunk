@@ -1,8 +1,6 @@
 #include <py/_utils.hpp>
 #include <numpy/arrayobject.h>
 
-bool isInBB(Vector3r p, Vector3r bbMin, Vector3r bbMax){return p[0]>bbMin[0] && p[0]<bbMax[0] && p[1]>bbMin[1] && p[1]<bbMax[1] && p[2]>bbMin[2] && p[2]<bbMax[2];}
-
 py::tuple negPosExtremeIds(int axis, Real distFactor){
 	vector<Vector3r> extrema=Shop::aabbExtrema();
 	Real minCoord=extrema[0][axis],maxCoord=extrema[1][axis];
@@ -20,7 +18,7 @@ py::tuple coordsAndDisplacements(int axis,py::tuple Aabb){
 	if(useBB){bbMin=py::extract<Vector3r>(Aabb[0])();bbMax=py::extract<Vector3r>(Aabb[1])();}
 	py::list retCoord,retDispl;
 	FOREACH(const shared_ptr<Body>&b, *Omega::instance().getScene()->bodies){
-		if(useBB && !isInBB(b->state->pos,bbMin,bbMax)) continue;
+		if(useBB && !Shop::isInBB(b->state->pos,bbMin,bbMax)) continue;
 		retCoord.append(b->state->pos[axis]);
 		retDispl.append(b->state->pos[axis]-b->state->refPos[axis]);
 	}
@@ -51,7 +49,7 @@ py::tuple interactionAnglesHistogram(int axis, int mask, size_t bins, py::tuple 
 		if(!i->isReal()) continue;
 		const shared_ptr<Body>& b1=Body::byId(i->getId1(),rb), b2=Body::byId(i->getId2(),rb);
 		if(!b1->maskOk(mask) || !b2->maskOk(mask)) continue;
-		if(useBB && !isInBB(b1->state->pos,bbMin,bbMax) && !isInBB(b2->state->pos,bbMin,bbMax)) continue;
+		if(useBB && !Shop::isInBB(b1->state->pos,bbMin,bbMax) && !Shop::isInBB(b2->state->pos,bbMin,bbMax)) continue;
 		if (sphSph && ( !dynamic_cast<Sphere*>(b1->shape.get()) || !dynamic_cast<Sphere*>(b2->shape.get()) ) ) continue;
 		GenericSpheresContact* geom=dynamic_cast<GenericSpheresContact*>(i->geom.get());
 		if(!geom) continue;
@@ -74,11 +72,11 @@ py::tuple bodyNumInteractionsHistogram(py::tuple aabb){
 	FOREACH(const shared_ptr<Interaction>& i, *rb->interactions){
 		if(!i->isReal()) continue;
 		const Body::id_t id1=i->getId1(), id2=i->getId2(); const shared_ptr<Body>& b1=Body::byId(id1,rb), b2=Body::byId(id2,rb);
-		if((useBB && isInBB(b1->state->pos,bbMin,bbMax)) || !useBB) {
+		if((useBB && Shop::isInBB(b1->state->pos,bbMin,bbMax)) || !useBB) {
 			if (b1->isClumpMember()) bodyNumIntr[b1->clumpId]+=1; //count bodyNumIntr for the clump, not for the member 
 			else bodyNumIntr[id1]+=1;
 		}
-		if((useBB && isInBB(b2->state->pos,bbMin,bbMax)) || !useBB) {
+		if((useBB && Shop::isInBB(b2->state->pos,bbMin,bbMax)) || !useBB) {
 			if (b2->isClumpMember()) bodyNumIntr[b2->clumpId]+=1; //count bodyNumIntr for the clump, not for the member 
 			else bodyNumIntr[id2]+=1;
 		}
@@ -93,7 +91,7 @@ py::tuple bodyNumInteractionsHistogram(py::tuple aabb){
 			if(bodyNumIntr[id]>0) bins[bodyNumIntr[id]]+=1;
 			// 0 is handled specially: add body to the 0 bin only if it is inside the bb requested (if applicable)
 			// otherwise don't do anything, since it is outside the volume of interest
-			else if(((useBB && isInBB(b->state->pos,bbMin,bbMax)) || !useBB) && !(b->isClumpMember())) bins[0]+=1;
+			else if(((useBB && Shop::isInBB(b->state->pos,bbMin,bbMax)) || !useBB) && !(b->isClumpMember())) bins[0]+=1;
 		}
 	}
 	py::list count,num;
@@ -463,7 +461,7 @@ BOOST_PYTHON_MODULE(_utils){
 	py::def("porosity",Shop__getPorosity,(py::arg("volume")=-1),"Compute packing porosity $\\frac{V-V_s}{V}$ where $V$ is overall volume and $V_s$ is volume of spheres.\n\n:param float volume: overall volume $V$. For periodic simulations, current volume of the :yref:`Cell` is used. For aperiodic simulations, the value deduced from utils.aabbDim() is used. For compatibility reasons, positive values passed by the user are also accepted in this case.\n");
 	py::def("voxelPorosity",Shop__getVoxelPorosity,(py::arg("resolution")=200,py::arg("start")=Vector3r(0,0,0),py::arg("end")=Vector3r(0,0,0)),"Compute packing porosity $\\frac{V-V_v}{V}$ where $V$ is a specified volume (from start to end) and $V_v$ is volume of voxels that fall inside any sphere. The calculation method is to divide whole volume into a dense grid of voxels (at given resolution), and count the voxels that fall inside any of the spheres. This method allows one to calculate porosity in any given sub-volume of a whole sample. It is properly excluding part of a sphere that does not fall inside a specified volume.\n\n:param int resolution: voxel grid resolution, values bigger than resolution=1600 require a 64 bit operating system, because more than 4GB of RAM is used, a resolution=800 will use 500MB of RAM.\n:param Vector3 start: start corner of the volume.\n:param Vector3 end: end corner of the volume.\n");
 	py::def("aabbExtrema",Shop::aabbExtrema,(py::arg("cutoff")=0.0,py::arg("centers")=false),"Return coordinates of box enclosing all spherical bodies\n\n:param bool centers: do not take sphere radii in account, only their centroids\n:param float∈〈0…1〉 cutoff: relative dimension by which the box will be cut away at its boundaries.\n\n\n:return: [lower corner, upper corner] as [Vector3,Vector3]\n\n");
-	py::def("ptInAABB",isInBB,"Return True/False whether the point p is within box given by its min and max corners");
+	py::def("ptInAABB",Shop::isInBB,"Return True/False whether the point p is within box given by its min and max corners");
 	py::def("negPosExtremeIds",negPosExtremeIds,(py::arg("axis"),py::arg("distFactor")),"Return list of ids for spheres (only) that are on extremal ends of the specimen along given axis; distFactor multiplies their radius so that sphere that do not touch the boundary coordinate can also be returned.");
 	py::def("approxSectionArea",approxSectionArea,"Compute area of convex hull when when taking (swept) spheres crossing the plane at coord, perpendicular to axis.");
 	py::def("coordsAndDisplacements",coordsAndDisplacements,(py::arg("axis"),py::arg("Aabb")=py::tuple()),"Return tuple of 2 same-length lists for coordinates and displacements (coordinate minus reference coordinate) along given axis (1st arg); if the Aabb=((x_min,y_min,z_min),(x_max,y_max,z_max)) box is given, only bodies within this box will be considered.");

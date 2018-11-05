@@ -1,3 +1,5 @@
+#pragma once
+
 #include<pkg/dem/Shop.hpp>
 #include<core/Scene.hpp>
 #include<core/Omega.hpp>
@@ -12,8 +14,6 @@
 #include<pkg/dem/ViscoelasticPM.hpp>
 
 namespace py = boost::python;
-
-bool isInBB(Vector3r p, Vector3r bbMin, Vector3r bbMax);
 
 py::tuple negPosExtremeIds(int axis, Real distFactor=1.1);
 
