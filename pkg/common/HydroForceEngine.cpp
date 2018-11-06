@@ -553,9 +553,9 @@ void HydroForceEngine::fluidResolution(double tfin,double dt)
 		a[0]=0.; b[0]=1.; c[0]=0.; s[0]=0.;
 
 		// Top boundary condition: (0: no-slip / 1: zero gradient) 
-		if (iusl==0){ a[nCell]=0.;  b[nCell]=1.; c[nCell]=0.; }
-		else if (iusl==1){ a[nCell]=-1.; b[nCell]=1.; c[nCell]=0.; }
-		s[nCell]=0.;       
+		if (iusl==0){a[nCell]=0.;  b[nCell]=1.; c[nCell]=0.; s[nCell] = uTop;}
+		else if (iusl==1){ a[nCell]=-1.; b[nCell]=1.; c[nCell]=0.; s[nCell]=0.;}
+
 
 		//Loop over the spatial mesh to determine the matricial coefficient, (a,b,c,s), from j+1=1 to j+1=nCell-1 (values 0 and nCell correspond to BC)
 		for(j=0;j<nCell-1;j++){
