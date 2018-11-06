@@ -7,6 +7,8 @@
 # and account for the presence of particles and for the momentum transfered to the particle phase through the hydrodynamic forces imposed. The fluid-particle system momentum 
 # is therefore conserved. 
 #
+# Reproduce the case r2d6s2 of Maurin et al, Journal of Fluid Mechanics, 804, 490-512 (2016)
+#
 # Data can be saved and plot with the file postProcessing.py
 #
 ############################################################################################################################################################################
@@ -95,10 +97,10 @@ O.bodies.append([lowPlane,WaterSurface]) #add to simulation
 L = range(0,int(length/(diameterPart))) #The length is divided in particle diameter
 W = range(0,int(width/(diameterPart))) #The width is divided in particle diameter
 
-for x in L: #loop creating a set of sphere sticked at the bottom with a (uniform) random altitude comprised between 0.5 (diameter/12) and 5.5mm (11diameter/12) with steps of 0.5mm. The repartition along z is made around groundPosition.
+for x in L: #loop creating a set of sphere sticked at the bottom with a random altitude comprised between -0.5 and 0.5 diameter around groundPosition.
 	for y in W:
-		n =  rand.randrange(0,12,1)/12.0*diameterPart     #Define a number between 0 and 11/12 diameter with steps of 1/12 diameter (0.5mm in the experiment)    
-		O.bodies.append(sphere((x*diameterPart, y*diameterPart,groundPosition - 11*diameterPart/12.0/2.0 + n),diameterPart/2.,color=(0,0,0),fixed = True,material = 'Mat'))
+		n =  rand.random()     #Define a number between 0 and 1
+		O.bodies.append(sphere((x*diameterPart, y*diameterPart,groundPosition + (-0.5+n)*diameterPart),diameterPart/2.,color=(0,0,0),fixed = True,material = 'Mat'))
 
 
 #Create a loose cloud of particle inside the cell
