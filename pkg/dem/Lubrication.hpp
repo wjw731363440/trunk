@@ -119,3 +119,29 @@ class Law2_ScGeom_ImplicitLubricationPhys: public LawFunctor{
                 DECLARE_LOGGER;
 };
 REGISTER_SERIALIZABLE(Law2_ScGeom_ImplicitLubricationPhys);
+
+class LubricationDPFEngine: public PeriodicEngine {
+	public :
+		static void getSpectrums(vector<vector<Matrix3r> > &NC, vector<vector<Matrix3r> > &SC, vector<vector<Matrix3r> > &NL, vector<vector<Matrix3r> > &SL, int nPhi, int nTheta);
+		static py::tuple PyGetSpectrums(int nPhi, int nTheta);
+		virtual void action();
+	YADE_CLASS_BASE_DOC_ATTRS_CTOR_PY(LubricationDPFEngine,PeriodicEngine,
+		"Compute density probability function for components of lubricated contact model. All disabled by default.",
+		/*((bool, computePairDistance, false,, "Compute pair density function $(\\theta,\\phi, r/a)$"))
+		((bool, computeInContact, false,, "Compute contact density function $(\\theta,\\phi)$"))
+		((bool, computeInFrictionnalContact, false,, "Compute frictional contact density function $(\\theta,\\phi)$"))
+		((bool, computeNormalLubrication, false,, "Compute normal lubrication stress density function $(\\theta, \\phi)$"))
+		((bool, computeShearLubrication, false,, "Compute shear lubrication stress density function $(\\theta, \\phi)$"))
+		((bool, computeNormalContact, false,, "Compute normal contact stress density function $(\\theta, \\phi)$"))
+		((bool, computeShearContact, false,, "Compute shear contact stress density function $(\\theta, \\phi)$"))*/
+		((int, numDiscretizeAngleTheta, 20,,"Number of sector for theta-angle"))
+		((int, numDiscretizeAnglePhi, 40,,"Number of sector for phi-angle"))
+		((Real, discretizeRadius, 0.1,,"d/a interval size"))
+		((string, filename, "", , "Filename"))
+		((bool, firstRun, true, (Attr::hidden | Attr::readonly), ""))
+		,,
+		.def("getSpectrums", &LubricationDPFEngine::PyGetSpectrums,(py::arg("nPhi")=40, py::arg("nTheta")=20), "Get Stress spectrums").staticmethod("getSpectrums")
+	);
+	DECLARE_LOGGER;
+};
+REGISTER_SERIALIZABLE(LubricationDPFEngine);

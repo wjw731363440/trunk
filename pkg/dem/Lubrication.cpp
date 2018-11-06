@@ -1,7 +1,7 @@
 
 #include "Lubrication.hpp"
 
-YADE_PLUGIN((Ip2_FrictMat_FrictMat_LubricationPhys)(LubricationPhys)(Law2_ScGeom_ImplicitLubricationPhys))
+YADE_PLUGIN((Ip2_FrictMat_FrictMat_LubricationPhys)(LubricationPhys)(Law2_ScGeom_ImplicitLubricationPhys)(LubricationDPFEngine))
 
 LubricationPhys::~LubricationPhys()
 {
@@ -564,7 +564,7 @@ CREATE_LOGGER(Law2_ScGeom_ImplicitLubricationPhys);
 
 void Law2_ScGeom_ImplicitLubricationPhys::getStressForEachBody(vector<Matrix3r>& NCStresses, vector<Matrix3r>& SCStresses, vector<Matrix3r>& NLStresses, vector<Matrix3r>& SLStresses)
 {
-  	const shared_ptr<Scene>& scene=Omega::instance().getScene();
+	const shared_ptr<Scene>& scene=Omega::instance().getScene();
 	NCStresses.resize(scene->bodies->size());
 	SCStresses.resize(scene->bodies->size());
 	NLStresses.resize(scene->bodies->size());
@@ -656,4 +656,110 @@ py::tuple Law2_ScGeom_ImplicitLubricationPhys::PyGetTotalStresses()
 	return py::make_tuple(nc, sc, nl, sl);
 }
 
+py::tuple LubricationDPFEngine::PyGetSpectrums(int np, int nt)
+{
+	vector<vector<Matrix3r> > NC, SC, NL, SL;
+	getSpectrums(NC, SC, NL, SL, np, nt);
+	
+	return py::make_tuple(NC, SC, NL, SL);
+}
 
+void LubricationDPFEngine::action()
+{
+	vector<vector<vector<Matrix3r> > > Stresses;
+	Stresses.resize(4);
+	getSpectrums(Stresses[0], Stresses[1], Stresses[2], Stresses[3], numDiscretizeAnglePhi, numDiscretizeAngleTheta);
+	
+	string suff[] = {"xx", "xy", "xz", "yx", "yy", "yz", "zx", "zy", "zz"};
+	string stuff[] = {"NC", "SC", "NL", "SL"};
+	
+	FILE* fid = fopen(filename.c_str(), "a");
+	
+	if(fid) {
+		if(firstRun) {
+			fprintf(fid, "# ");
+			for(int l(0);l<4;l++)
+				for(int i(0);i<numDiscretizeAngleTheta;i++)
+					for(int j(0);j<numDiscretizeAnglePhi;j++)
+						for(int k(0);k<9;k++)
+							fprintf(fid,"%s_%s(%f,%f)\t", stuff[l].c_str(), suff[k].c_str(), i*Mathr::PI/numDiscretizeAngleTheta, j*Mathr::PI*2./numDiscretizeAnglePhi - Mathr::PI);
+			fprintf(fid, "\n");
+			firstRun = false;
+		}
+		
+		for(uint l(0);l<Stresses.size();l++)
+			for(int i(0);i<numDiscretizeAngleTheta;i++)
+				for(int j(0);j<numDiscretizeAnglePhi;j++)
+					for(int I(0);I<3;I++)
+						for(int J(0);J<3;J++)
+							fprintf(fid,"%f\t",Stresses[l][i][j](I,J));
+
+		fprintf(fid, "\n");		
+		fclose(fid);
+	}
+}
+
+void LubricationDPFEngine::getSpectrums(vector<vector<Matrix3r> > &NC, vector<vector<Matrix3r> > &SC, vector<vector<Matrix3r> > &NL, vector<vector<Matrix3r> > &SL, int nPhi, int nTheta)
+{
+	const shared_ptr<Scene>& scene=Omega::instance().getScene();
+	
+	NC.resize(nTheta);
+	SC.resize(nTheta);
+	NL.resize(nTheta);
+	SL.resize(nTheta);
+	
+	for(int i(0);i<nTheta;i++)
+	{
+		NC[i].resize(nPhi);
+		SC[i].resize(nPhi);
+		NL[i].resize(nPhi);
+		SL[i].resize(nPhi);
+		
+		for(int j(0);j<nPhi;j++)
+		{
+			NC[i][j] = Matrix3r::Zero();
+			SC[i][j] = Matrix3r::Zero();
+			NL[i][j] = Matrix3r::Zero();
+			SL[i][j] = Matrix3r::Zero();
+		}
+	}
+	
+	FOREACH(const shared_ptr<Interaction>& I, *scene->interactions){
+		if(!I->isReal()) continue;
+		GenericSpheresContact* geom=YADE_CAST<GenericSpheresContact*>(I->geom.get());
+		LubricationPhys* phys=YADE_CAST<LubricationPhys*>(I->phys.get());
+		
+		if(phys && geom)
+		{
+			Real r = geom->refR1 + geom->refR2 - geom->penetrationDepth;
+			Vector3r l = r/scene->cell->getVolume()*geom->normal;
+			
+			// Convention: Oxy: phi=0, Oxz: theta=pi/2, Oyz: phi=pi/2
+			Real theta 	= acos(geom->normal.y()/r); //[0;pi]
+			Real phi 	= atan2(geom->normal.z(), geom->normal.x()) + Mathr::PI; //[-pi;pi] => [0; 2pi] for index calculation
+			
+			Real dTheta = (Mathr::PI / nTheta);
+			Real dPhi	= (2.*Mathr::PI / nPhi);
+			Real dS = sin(theta) * dTheta * dPhi;
+			l = l / dS;
+			
+			int idT1 = ((int)round((theta) / dTheta) % nTheta;
+			int idP1 = ((int)round((phi) / dPhi) % nPhi;
+			int idT2 = ((int)round((Mathr::PI - theta) / dTheta) % nTheta;
+			int idP2 = ((int)round((Mathr::PI + phi) / dPhi) % nPhi;
+			
+			//LOG_DEBUG(" idx " << idT1 << " " << idP1 << " " << idT2 << " " << idP2);
+			
+			NC[idT1][idP1] += phys->normalContactForce*l.transpose();
+			NC[idT2][idP2] += phys->normalContactForce*l.transpose();
+			SC[idT1][idP1] += phys->shearContactForce*l.transpose();
+			SC[idT2][idP2] += phys->shearContactForce*l.transpose();
+			NL[idT1][idP1] += phys->normalLubricationForce*l.transpose();
+			NL[idT2][idP2] += phys->normalLubricationForce*l.transpose();
+			SL[idT1][idP1] += phys->shearLubricationForce*l.transpose();
+			SL[idT2][idP2] += phys->shearLubricationForce*l.transpose();
+		}
+	}
+}
+
+CREATE_LOGGER(LubricationDPFEngine);
