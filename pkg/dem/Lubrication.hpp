@@ -155,7 +155,7 @@ public:
 	DECLARE_LOGGER;
 };
 
-using LPDFEngine=PDFEngine<LubricationPhys>;
+typedef PDFEngine<LubricationPhys> LPDFEngine;
 REGISTER_SERIALIZABLE(LPDFEngine);
 
 class LubricationPDFEngine: public LPDFEngine {
