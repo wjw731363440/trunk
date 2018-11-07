@@ -1,8 +1,11 @@
 Publications on Yade
 =====================
-This page should be a relatively complete list of publications on Yade itself or done with Yade. If you publish something, do not hesitate to add it on the list. If you don't have direct access to the source code, please send the reference (as a bibtex item) to the `editorial board <mailto:yadedemboard@gmail.com>`_. If PDF is freely available, add url for direct fulltext downlad. If not, consider uploading fulltext in PDF, either to `Yade wiki <https://www.yade-dem.org/wiki/>`_ or to other website, if legally permitted.
+Publications on Yade itself or done with Yade are listed on this page. 
 
 The first section gives the references that we kindly ask you to use for citing Yade in publications, as explained in the `"Acknowledging Yade" <citing.html>`_ section.
+
+There are currently so many published papers using Yade that it becomes difficult to list them all, hence coverage of recent years is only partial.
+So, please, help us: if you have or know about publications related to Yade do not hesitate to add it to this list. If you don't have direct access to the source code, please send the reference (as a bibtex item) to `Yade developpers <yade-dev@lists.launchpad.net>`_. If PDF is freely available, add url for direct fulltext downlad. If not, consider uploading fulltext in PDF, either to `Yade wiki <https://www.yade-dem.org/wiki/>`_ or to other website, if legally permitted.
 
 .. note:: This file is generated from :ysrc:`doc/yade-articles.bib`, :ysrc:`doc/yade-conferences.bib`, :ysrc:`doc/yade-theses.bib` and :ysrc:`doc/yade-docref.bib`.
 
