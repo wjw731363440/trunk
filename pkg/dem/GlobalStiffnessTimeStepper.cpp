@@ -55,7 +55,7 @@ void GlobalStiffnessTimeStepper::findTimeStepFromBody(const shared_ptr<Body>& bo
 			}
 			if (sdec->densityScaling<=0)  sdec->densityScaling = timestepSafetyCoefficient*pow(dt/targetDt,2.0);
 			else sdec->densityScaling = min(1.01*sdec->densityScaling, timestepSafetyCoefficient*pow(dt/targetDt,2.0));}
-		if (not viscEl) return; // not possible to compute!
+		return; // not possible to compute!
 	} else {
 		//Normal case: determine the elastic minimum eigenperiod (and if required determine also the viscous one separately and take the minimum of the two)
 		Real dtx, dty, dtz;
