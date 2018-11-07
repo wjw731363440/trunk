@@ -120,28 +120,54 @@ class Law2_ScGeom_ImplicitLubricationPhys: public LawFunctor{
 };
 REGISTER_SERIALIZABLE(Law2_ScGeom_ImplicitLubricationPhys);
 
-class LubricationDPFEngine: public PeriodicEngine {
-	public :
-		static void getSpectrums(vector<vector<Matrix3r> > &NC, vector<vector<Matrix3r> > &SC, vector<vector<Matrix3r> > &NL, vector<vector<Matrix3r> > &SL, int nPhi, int nTheta);
-		static py::tuple PyGetSpectrums(int nPhi, int nTheta);
-		virtual void action();
-	YADE_CLASS_BASE_DOC_ATTRS_CTOR_PY(LubricationDPFEngine,PeriodicEngine,
-		"Compute density probability function for components of lubricated contact model. All disabled by default.",
-		/*((bool, computePairDistance, false,, "Compute pair density function $(\\theta,\\phi, r/a)$"))
-		((bool, computeInContact, false,, "Compute contact density function $(\\theta,\\phi)$"))
-		((bool, computeInFrictionnalContact, false,, "Compute frictional contact density function $(\\theta,\\phi)$"))
-		((bool, computeNormalLubrication, false,, "Compute normal lubrication stress density function $(\\theta, \\phi)$"))
-		((bool, computeShearLubrication, false,, "Compute shear lubrication stress density function $(\\theta, \\phi)$"))
-		((bool, computeNormalContact, false,, "Compute normal contact stress density function $(\\theta, \\phi)$"))
-		((bool, computeShearContact, false,, "Compute shear contact stress density function $(\\theta, \\phi)$"))*/
+template<class Phys>
+class PDFEngine : public PeriodicEngine {
+
+public:
+	template<class out>
+	struct Data_s {
+		out Phys::*member;
+		string name;
+	};
+	
+	typedef struct Data_s<Vector3r> DataVector;
+	typedef struct Data_s<Matrix3r> DataMatrix;
+	typedef struct Data_s<Real> DataScalar;
+	
+	static void getStressSpectrums(vector<vector<vector<Matrix3r> > > &spects, vector<DataVector> const&, int,int);
+	
+	void writeToFile(vector<vector<vector<Matrix3r> > > const& stress_data, vector<DataVector > const&,
+		vector<vector<vector<Matrix3r> > > const& mat_data, vector<DataMatrix > const&,
+		vector<vector<vector<Vector3r> > > const& vector_data, vector<DataVector > const&,
+		vector<vector<vector<Real> > > const& scalar_data, vector<DataScalar > const&);
+	virtual void action() {};
+	
+	YADE_CLASS_BASE_DOC_ATTRS_CTOR_PY(PDFEngine, PeriodicEngine,
+		"Abstract class for spectrums calculation",
 		((int, numDiscretizeAngleTheta, 20,,"Number of sector for theta-angle"))
 		((int, numDiscretizeAnglePhi, 40,,"Number of sector for phi-angle"))
 		((Real, discretizeRadius, 0.1,,"d/a interval size"))
 		((string, filename, "", , "Filename"))
 		((bool, firstRun, true, (Attr::hidden | Attr::readonly), ""))
 		,,
-		.def("getSpectrums", &LubricationDPFEngine::PyGetSpectrums,(py::arg("nPhi")=40, py::arg("nTheta")=20), "Get Stress spectrums").staticmethod("getSpectrums")
+		//.def("getSpectrums", &LubricationDPFEngine::PyGetSpectrums,(py::arg("nPhi")=40, py::arg("nTheta")=20), "Get Stress spectrums").staticmethod("getSpectrums")
 	);
 	DECLARE_LOGGER;
 };
-REGISTER_SERIALIZABLE(LubricationDPFEngine);
+
+using LPDFEngine=PDFEngine<LubricationPhys>;
+REGISTER_SERIALIZABLE(LPDFEngine);
+
+class LubricationPDFEngine: public LPDFEngine {
+	public :
+		//static py::tuple PyGetSpectrums(int nPhi, int nTheta);
+		virtual void action();
+	YADE_CLASS_BASE_DOC_ATTRS_CTOR_PY(LubricationPDFEngine,LPDFEngine,
+		 "Implementation for Lubrication",
+		,,
+		//.def("getSpectrums", &LubricationDPFEngine::PyGetSpectrums,(py::arg("nPhi")=40, py::arg("nTheta")=20), "Get Stress spectrums").staticmethod("getSpectrums")
+	);
+	DECLARE_LOGGER;
+};
+REGISTER_SERIALIZABLE(LubricationPDFEngine);
+
