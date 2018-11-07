@@ -463,12 +463,20 @@ void HydroForceEngine::fluidResolution(double tfin,double dt)
 	//  Compute the effective viscosity (due to the presence of particles)
 	// 0 : Pure fluid viscosity
 	if (irheolf==0){for(j=0;j<nCell;j++)	viscoeff[j]=viscof;}
-	// 1 : Einstein's viscosity
+	// 1 : Einstein's effective viscosity
 	else if (irheolf==1){
 		viscoeff[0] = viscof*(1.+2.5*phiPart[0]);
 		for(j=1;j<nCell;j++){
 			phi_nodej = 0.5*(phiPart[j-1]+phiPart[j]); // solid volume fraction at (scalar) node j. 
 			viscoeff[j]=viscof*(1.+2.5*phi_nodej);
+		}
+	}
+	//2: fluid volume fraction power-law effective viscosity
+	else if (irheolf==2){
+		viscoeff[0] = viscof*(1.+2.5*phiPart[0]);
+		for(j=1;j<nCell;j++){
+			phi_nodej = 0.5*(phiPart[j-1]+phiPart[j]); // solid volume fraction at (scalar) node j. 
+			viscoeff[j]=viscof*pow(1-phi_nodej,-2.8);
 		}
 	}
 
