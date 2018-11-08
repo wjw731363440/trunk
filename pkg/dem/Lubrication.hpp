@@ -12,6 +12,7 @@
 #include<pkg/dem/FrictPhys.hpp>
 #include<pkg/dem/ElasticContactLaw.hpp>
 #include<pkg/dem/ViscoelasticPM.hpp>
+#include<pkg/dem/PDFEngine.hpp>
 
 
 namespace py=boost::python;
@@ -120,52 +121,14 @@ class Law2_ScGeom_ImplicitLubricationPhys: public LawFunctor{
 };
 REGISTER_SERIALIZABLE(Law2_ScGeom_ImplicitLubricationPhys);
 
-template<class Phys>
-class PDFEngine : public PeriodicEngine {
 
-public:
-	template<class out>
-	struct Data_s {
-		out Phys::*member;
-		string name;
-	};
-	
-	typedef struct Data_s<Vector3r> DataVector;
-	typedef struct Data_s<Matrix3r> DataMatrix;
-	typedef struct Data_s<Real> DataScalar;
-	
-	static void getStressSpectrums(vector<vector<vector<Matrix3r> > > &spects, vector<DataVector> const&, int,int);
-	
-	void writeToFile(vector<vector<vector<Matrix3r> > > const& stress_data, vector<DataVector > const&,
-		vector<vector<vector<Matrix3r> > > const& mat_data, vector<DataMatrix > const&,
-		vector<vector<vector<Vector3r> > > const& vector_data, vector<DataVector > const&,
-		vector<vector<vector<Real> > > const& scalar_data, vector<DataScalar > const&);
-	virtual void action() {};
-	
-	YADE_CLASS_BASE_DOC_ATTRS_CTOR_PY(PDFEngine, PeriodicEngine,
-		"Abstract class for spectrums calculation",
-		((int, numDiscretizeAngleTheta, 20,,"Number of sector for theta-angle"))
-		((int, numDiscretizeAnglePhi, 40,,"Number of sector for phi-angle"))
-		((Real, discretizeRadius, 0.1,,"d/a interval size"))
-		((string, filename, "", , "Filename"))
-		((bool, firstRun, true, (Attr::hidden | Attr::readonly), ""))
-		,,
-		//.def("getSpectrums", &LubricationDPFEngine::PyGetSpectrums,(py::arg("nPhi")=40, py::arg("nTheta")=20), "Get Stress spectrums").staticmethod("getSpectrums")
-	);
-	DECLARE_LOGGER;
-};
 
-typedef PDFEngine<LubricationPhys> LPDFEngine;
-REGISTER_SERIALIZABLE(LPDFEngine);
-
-class LubricationPDFEngine: public LPDFEngine {
+class LubricationPDFEngine: public PDFEngine {
 	public :
-		//static py::tuple PyGetSpectrums(int nPhi, int nTheta);
 		virtual void action();
-	YADE_CLASS_BASE_DOC_ATTRS_CTOR_PY(LubricationPDFEngine,LPDFEngine,
-		 "Implementation for Lubrication",
-		,,
-		//.def("getSpectrums", &LubricationDPFEngine::PyGetSpectrums,(py::arg("nPhi")=40, py::arg("nTheta")=20), "Get Stress spectrums").staticmethod("getSpectrums")
+	YADE_CLASS_BASE_DOC_ATTRS_CTOR_PY(LubricationPDFEngine,PDFEngine,
+		 "Implementation of :yref:`PDFEngine` for Lubrication law",/*ATTRS*/
+		,/*CTOR*/,/*PY*/
 	);
 	DECLARE_LOGGER;
 };
