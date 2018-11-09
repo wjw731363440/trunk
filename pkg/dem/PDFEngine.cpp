@@ -94,3 +94,107 @@ void PDFEngine::writeToFile(vector<PDFEngine::PDF> const& pdfs)
 
 
 CREATE_LOGGER(PDFEngine);
+
+PDFSpheresDistanceCalculator::PDFSpheresDistanceCalculator(string name) :
+	PDFEngine::PDFCalculator(name),
+	m_h(0.),
+	m_N(0)
+{
+	
+}
+
+vector<string> PDFSpheresDistanceCalculator::getDatas() const
+{
+	return vector<string>().push_back(to_string(m_h/m_N));
+}
+
+void PDFSpheresDistanceCalculator::cleanData()
+{
+	m_h = 0.;
+	m_N = 0;
+}
+
+bool PDFSpheresDistanceCalculator::addData(const shared_ptr<Interaction>& I, Real const& dS ,Real const& V, int const& N)
+{
+	if(!I->isReal()) return false;
+	ScGeom* geom=YADE_CAST<ScGeom*>(I->geom.get());
+    Real a((geom->radius1+geom->radius2)/2.);
+	
+	if(!geom)
+		return false;
+	
+	m_N++;
+	m_h -= geom->penetrationDepth/a;
+	
+	return true;
+}
+
+PDFSpheresVelocityCalculator::PDFSpheresVelocityCalculator(string name) :
+	PDFEngine::PDFCalculator(name),
+	m_vel(Vector3r::Zero()),
+	m_N(0)
+{
+	
+}
+
+vector<string> PDFSpheresVelocityCalculator::getSuffixes() const
+{
+	return vector<string>({"x","y","z"});
+}
+
+vector<string> PDFSpheresVelocityCalculator::getDatas() const
+{
+	vector<string> ret;
+	for(int i(0);i<3;i++) ret.push_back(to_string(m_vel(i)/m_N));
+	return ret;
+}
+
+void PDFSpheresVelocityCalculator::cleanData()
+{
+	m_vel = Vector3r::Zero();
+	m_N = 0;
+}
+
+bool PDFSpheresVelocityCalculator::addData(const shared_ptr<Interaction>& I, Real const& dS ,Real const& V, int const& N)
+{
+	if(!I->isReal()) return false;
+	
+	// Geometry
+    ScGeom* geom=static_cast<ScGeom*>(iGeom.get());
+	if(!geom) return false;
+
+    // geometric parameters
+    Real a((geom->radius1+geom->radius2)/2.);
+    Vector3r relV = geom->getIncidentVel(I, false);
+	
+	m_N++;
+	m_vel += relV;
+	
+	return true;
+}
+
+PDFSpheresVelocityCalculator::PDFSpheresIntrsCalculator(string name) :
+	PDFEngine::PDFCalculator(name),
+	m_P(0.)
+{
+	
+}
+
+vector<string> PDFSpheresVelocityCalculator::getDatas() const
+{
+	return vector<string>().push_back(to_string(m_P));
+}
+
+void PDFSpheresVelocityCalculator::cleanData()
+{
+	m_P = 0.;
+}
+
+bool PDFSpheresVelocityCalculator::addData(const shared_ptr<Interaction>& I, Real const& dS ,Real const& V, int const& N)
+{
+	if(!I->isReal()) return false;
+	
+	m_P += 1./(dS*N);
+	
+	return true;
+}

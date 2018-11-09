@@ -15,7 +15,7 @@ public:
 		PDFCalculator(string const& n) : name(n) {};
 		virtual ~PDFCalculator() {};
 		
-		virtual vector<string> getSuffixes() const = 0;
+		virtual vector<string> getSuffixes() const { return vector<string>().push_back(""); }
 		virtual vector<string> getDatas() const = 0;
 		virtual void cleanData() = 0;
 		virtual bool addData(const shared_ptr<Interaction>&, Real const& dS ,Real const& V, int const& N) = 0;
@@ -50,7 +50,7 @@ REGISTER_SERIALIZABLE(PDFEngine);
 template<class Phys>
 class PDFSpheresStressCalculator : public PDFEngine::PDFCalculator {
 public:
-	PDFSpheresStressCalculator(Vector3r Phys::* member, string name) : PDFEngine::PDFCalculator(name), m_member(member) {};
+	PDFSpheresStressCalculator(Vector3r Phys::* member, string name) : PDFEngine::PDFCalculator(name), m_member(member), m_stress(Matrix3r::Zero()) {};
 	vector<string> getSuffixes() const { return vector<string>({"xx", "xy", "xz", "yx", "yy", "yz", "zx", "zy", "zz"}); }
 	vector<string> getDatas() const {
 		vector<string> out;
@@ -64,7 +64,7 @@ public:
 	Phys* phys=YADE_CAST<Phys*>(I->phys.get());
 	
 	if(geom && phys) {
-		Real r = geom->refR1 + geom->refR2 - geom->penetrationDepth;
+		Real r = geom->radius1 + geom->radius2 - geom->penetrationDepth;
 		Vector3r l = r/(V*dS)*geom->normal;
 		m_stress += phys->*(m_member)*l.transpose();
 		return true;
@@ -76,4 +76,37 @@ public:
 private:
 	Vector3r Phys::*m_member;
 	Matrix3r m_stress;
+};
+
+class PDFSpheresDistanceCalculator : public PDFEngine::PDFCalculator {
+	PDFSpheresDistanceCalculator(string name);
+	vector<string> getDatas() const;
+	void cleanData();
+	bool addData(const shared_ptr<Interaction>&, Real const& dS ,Real const& V, int const& N);
+	
+private:
+	Real m_h;
+	uint m_N;
+};
+
+class PDFSpheresVelocityCalculator : public PDFEngine::PDFCalculator {
+	PDFSpheresVelocityCalculator(string name);
+	vector<string> getSuffixes() const;
+	vector<string> getDatas() const;
+	void cleanData();
+	bool addData(const shared_ptr<Interaction>&, Real const& dS ,Real const& V, int const& N);
+	
+private:
+	Vector3r m_vel;
+	uint m_N;
+};
+
+class PDFSpheresIntrsCalculator : public PDFEngine::PDFCalculator {
+	PDFSpheresIntrsCalculator(string name);
+	vector<string> getDatas() const;
+	void cleanData();
+	bool addData(const shared_ptr<Interaction>&, Real const& dS ,Real const& V, int const& N);
+	
+private:
+	Ream m_P;
 };
