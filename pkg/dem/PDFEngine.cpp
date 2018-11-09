@@ -105,7 +105,7 @@ PDFSpheresDistanceCalculator::PDFSpheresDistanceCalculator(string name) :
 
 vector<string> PDFSpheresDistanceCalculator::getDatas() const
 {
-	return vector<string>().push_back(to_string(m_h/m_N));
+	return vector<string>({std::to_string(m_h/m_N)});
 }
 
 void PDFSpheresDistanceCalculator::cleanData()
@@ -145,7 +145,7 @@ vector<string> PDFSpheresVelocityCalculator::getSuffixes() const
 vector<string> PDFSpheresVelocityCalculator::getDatas() const
 {
 	vector<string> ret;
-	for(int i(0);i<3;i++) ret.push_back(to_string(m_vel(i)/m_N));
+	for(int i(0);i<3;i++) ret.push_back(std::to_string(m_vel(i)/m_N));
 	return ret;
 }
 
@@ -160,12 +160,12 @@ bool PDFSpheresVelocityCalculator::addData(const shared_ptr<Interaction>& I, Rea
 	if(!I->isReal()) return false;
 	
 	// Geometry
-    ScGeom* geom=static_cast<ScGeom*>(iGeom.get());
+    ScGeom* geom=static_cast<ScGeom*>(I->geom.get());
 	if(!geom) return false;
 
     // geometric parameters
-    Real a((geom->radius1+geom->radius2)/2.);
-    Vector3r relV = geom->getIncidentVel(I, false);
+   // Real a((geom->radius1+geom->radius2)/2.);
+    Vector3r relV = geom->getIncidentVel_py(I, false);
 	
 	m_N++;
 	m_vel += relV;
@@ -173,24 +173,24 @@ bool PDFSpheresVelocityCalculator::addData(const shared_ptr<Interaction>& I, Rea
 	return true;
 }
 
-PDFSpheresVelocityCalculator::PDFSpheresIntrsCalculator(string name) :
+PDFSpheresIntrsCalculator::PDFSpheresIntrsCalculator(string name) :
 	PDFEngine::PDFCalculator(name),
 	m_P(0.)
 {
 	
 }
 
-vector<string> PDFSpheresVelocityCalculator::getDatas() const
+vector<string> PDFSpheresIntrsCalculator::getDatas() const
 {
-	return vector<string>().push_back(to_string(m_P));
+	return vector<string>({std::to_string(m_P)});
 }
 
-void PDFSpheresVelocityCalculator::cleanData()
+void PDFSpheresIntrsCalculator::cleanData()
 {
 	m_P = 0.;
 }
 
-bool PDFSpheresVelocityCalculator::addData(const shared_ptr<Interaction>& I, Real const& dS ,Real const& V, int const& N)
+bool PDFSpheresIntrsCalculator::addData(const shared_ptr<Interaction>& I, Real const& dS ,Real const& V, int const& N)
 {
 	if(!I->isReal()) return false;
 	

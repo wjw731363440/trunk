@@ -15,7 +15,7 @@ public:
 		PDFCalculator(string const& n) : name(n) {};
 		virtual ~PDFCalculator() {};
 		
-		virtual vector<string> getSuffixes() const { return vector<string>().push_back(""); }
+		virtual vector<string> getSuffixes() const { return vector<string>({""}); }
 		virtual vector<string> getDatas() const = 0;
 		virtual void cleanData() = 0;
 		virtual bool addData(const shared_ptr<Interaction>&, Real const& dS ,Real const& V, int const& N) = 0;
@@ -79,6 +79,7 @@ private:
 };
 
 class PDFSpheresDistanceCalculator : public PDFEngine::PDFCalculator {
+public:
 	PDFSpheresDistanceCalculator(string name);
 	vector<string> getDatas() const;
 	void cleanData();
@@ -90,6 +91,7 @@ private:
 };
 
 class PDFSpheresVelocityCalculator : public PDFEngine::PDFCalculator {
+public:
 	PDFSpheresVelocityCalculator(string name);
 	vector<string> getSuffixes() const;
 	vector<string> getDatas() const;
@@ -102,11 +104,12 @@ private:
 };
 
 class PDFSpheresIntrsCalculator : public PDFEngine::PDFCalculator {
+public:
 	PDFSpheresIntrsCalculator(string name);
 	vector<string> getDatas() const;
 	void cleanData();
 	bool addData(const shared_ptr<Interaction>&, Real const& dS ,Real const& V, int const& N);
 	
 private:
-	Ream m_P;
+	Real m_P;
 };
