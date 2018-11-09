@@ -659,7 +659,7 @@ py::tuple Law2_ScGeom_ImplicitLubricationPhys::PyGetTotalStresses()
 void LubricationPDFEngine::action()
 {
 	vector<PDFEngine::PDF> pdfs;
-	pdfs.resize(4);
+	pdfs.resize(7);
 	
 	for(uint i(0);i<pdfs.size();i++) {
 		pdfs[i].resize(boost::extents[numDiscretizeAngleTheta][numDiscretizeAnglePhi]);
@@ -671,6 +671,9 @@ void LubricationPDFEngine::action()
 		pdfs[1][t][p] = shared_ptr<PDFCalculator>(new PDFSpheresStressCalculator<LubricationPhys>(&LubricationPhys::shearContactForce, "SC"));
 		pdfs[2][t][p] = shared_ptr<PDFCalculator>(new PDFSpheresStressCalculator<LubricationPhys>(&LubricationPhys::normalLubricationForce, "NL"));
 		pdfs[3][t][p] = shared_ptr<PDFCalculator>(new PDFSpheresStressCalculator<LubricationPhys>(&LubricationPhys::shearLubricationForce, "SL"));
+		pdfs[4][t][p] = shared_ptr<PDFCalculator>(new PDFSpheresDistanceCalculator("h"));
+		pdfs[5][t][p] = shared_ptr<PDFCalculator>(new PDFSpheresVelocityCalculator("v"));
+		pdfs[6][t][p] = shared_ptr<PDFCalculator>(new PDFSpheresIntrsCalculator("P"));
 	}
 	
 	getSpectrums(pdfs); // Where the magic happen :)
