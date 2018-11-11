@@ -56,6 +56,8 @@ void PDFEngine::writeToFile(vector<PDFEngine::PDF> const& pdfs)
 	
 	if(fid) {
 		if(firstRun) {
+			
+			fprintf(fid, "# ");
 			for(uint i(0);i<pdfs.size();i++) {
 				uint nTheta = pdfs[i].shape()[0];
 				uint nPhi = pdfs[i].shape()[1];
@@ -90,6 +92,28 @@ void PDFEngine::writeToFile(vector<PDFEngine::PDF> const& pdfs)
 		if(!warnedOnce) LOG_ERROR("Unable to open " << filename << " for PDF writing");
 		warnedOnce = true;
 	}
+}
+
+void PDFEngine::action()
+{
+	vector<PDFEngine::PDF> pdfs;
+	pdfs.resize(5);
+	
+	for(uint i(0);i<pdfs.size();i++) {
+		pdfs[i].resize(boost::extents[numDiscretizeAngleTheta][numDiscretizeAnglePhi]);
+	}
+	
+	// Hint: If you want data on particular points, allocate only those pointers.
+	for(uint t(0);t<numDiscretizeAngleTheta;t++) for(uint p(0);p<numDiscretizeAnglePhi;p++) {
+		pdfs[0][t][p] = shared_ptr<PDFCalculator>(new PDFSpheresStressCalculator<NormPhys>(&NormPhys::normalForce, "normalStress"));
+		pdfs[1][t][p] = shared_ptr<PDFCalculator>(new PDFSpheresStressCalculator<NormShearPhys>(&NormShearPhys::shearForce, "shearStress"));
+		pdfs[2][t][p] = shared_ptr<PDFCalculator>(new PDFSpheresDistanceCalculator("h"));
+		pdfs[3][t][p] = shared_ptr<PDFCalculator>(new PDFSpheresVelocityCalculator("v"));
+		pdfs[4][t][p] = shared_ptr<PDFCalculator>(new PDFSpheresIntrsCalculator("P"));
+	}
+	
+	getSpectrums(pdfs); // Where the magic happen :)
+	writeToFile(pdfs);
 }
 
 

@@ -5,6 +5,7 @@
 #include <boost/multi_array.hpp>
 #include <pkg/dem/ScGeom.hpp>
 #include <pkg/common/PeriodicEngines.hpp>
+#include <pkg/common/NormShearPhys.hpp>
 
 
 class PDFEngine : public PeriodicEngine {
@@ -26,7 +27,7 @@ public:
 	typedef boost::multi_array<shared_ptr<PDFCalculator>, 2> PDF;
 	
 	static void getSpectrums(vector<PDF> &);
-	virtual void action() { LOG_WARN("Don't use this class directly! Use Law-specific implementation instead."); warnedOnce = true;};
+	virtual void action();
 	
 	YADE_CLASS_BASE_DOC_ATTRS_CTOR_PY(PDFEngine, PeriodicEngine,
 		"Base class for spectrums calculations. Should not be used directly. Compute Probability Density Functions in spherical coordinates and write result to a file.",
