@@ -61,8 +61,8 @@ public:
 	void cleanData() { m_stress = Matrix3r::Zero(); }
 	bool addData(const shared_ptr<Interaction>& I, Real const& dS, Real const& V, int const& N) {
 		if(!I->isReal()) return false;
-	ScGeom* geom=YADE_CAST<ScGeom*>(I->geom.get());
-	Phys* phys=YADE_CAST<Phys*>(I->phys.get());
+	ScGeom* geom=dynamic_cast<ScGeom*>(I->geom.get());
+	Phys* phys=dynamic_cast<Phys*>(I->phys.get());
 	
 	if(geom && phys) {
 		Real r = geom->radius1 + geom->radius2 - geom->penetrationDepth;

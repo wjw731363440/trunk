@@ -26,7 +26,7 @@ void PDFEngine::getSpectrums(vector<PDFEngine::PDF> & pdfs)
 	
 	FOREACH(const shared_ptr<Interaction>& I, *scene->interactions) {
 		if(!I->isReal()) continue;
-		GenericSpheresContact* geom=YADE_CAST<GenericSpheresContact*>(I->geom.get());
+		GenericSpheresContact* geom=dynamic_cast<GenericSpheresContact*>(I->geom.get());
 		
 		if(geom)
 		{
@@ -141,7 +141,7 @@ void PDFSpheresDistanceCalculator::cleanData()
 bool PDFSpheresDistanceCalculator::addData(const shared_ptr<Interaction>& I, Real const& dS ,Real const& V, int const& N)
 {
 	if(!I->isReal()) return false;
-	ScGeom* geom=YADE_CAST<ScGeom*>(I->geom.get());
+	ScGeom* geom=dynamic_cast<ScGeom*>(I->geom.get());
     Real a((geom->radius1+geom->radius2)/2.);
 	
 	if(!geom)
