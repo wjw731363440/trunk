@@ -431,7 +431,7 @@ Some RTTI information can be accessed from python:
 
 	Yade [2]: yade.system.childClasses('Shape')
 
-	Yade [3]: Sphere().name            ## getClassName()
+	Yade [3]: Sphere().__class__.__name__            ## getClassName()
 
 
 Serialization
