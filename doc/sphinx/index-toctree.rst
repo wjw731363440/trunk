@@ -40,6 +40,8 @@ Welcome to Yade's documentation!
 
   publications.rst
 
+  yadeTechArchive.rst
+
   references.rst
 
 Indices and tables
