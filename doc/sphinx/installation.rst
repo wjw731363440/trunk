@@ -217,7 +217,7 @@ syntax::
 
 	cmake -DOPTION1=VALUE1 -DOPTION2=VALUE2
 	
-As of Yade version git-2315bd8 (or 2018.02b release), the following options are available: (see the `source code <https://github.com/yade/trunk/blob/master/CMakeLists.txt>` for a most up-to-date list)
+As of Yade version git-2315bd8 (or 2018.02b release), the following options are available: (see the `source code <https://github.com/yade/trunk/blob/master/CMakeLists.txt>`_ for a most up-to-date list)
 	
 	* CMAKE_INSTALL_PREFIX: path where Yade should be installed (/usr/local by default)
 	* LIBRARY_OUTPUT_PATH: path to install libraries (lib by default)
