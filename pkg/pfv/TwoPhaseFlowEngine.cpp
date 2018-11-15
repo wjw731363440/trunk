@@ -434,8 +434,7 @@ void TwoPhaseFlowEngine::savePhaseVtk(const char* folder, bool withBoundaries)
 	basicVTKwritter vtkfile(0,0);
 	solver->saveMesh(vtkfile,withBoundaries,allIds,fictiousN,filename);
 	solver->noCache=initNoCache;
-	RTriangulation& Tri = solver->tesselation().Triangulation();
-	
+		
 	vtkfile.begin_data("Pressure",CELL_DATA,SCALARS,FLOAT);
 	for (unsigned kk=0; kk<allIds.size(); kk++) vtkfile.write_data(solver->tesselation().cellHandles[allIds[kk]]->info().p());
 	vtkfile.end_data();
