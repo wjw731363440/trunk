@@ -109,6 +109,21 @@ class TemplateFlowEngine_@TEMPLATE_FLOW_NAME@ : public PartialEngine
 				LOG_ERROR("id out of range, max value is "<<solver->T[solver->currentTes].cellHandles.size());
 				return false;}
 			return true;}
+			
+		vector<unsigned> getIncidentCells(unsigned vertexId) {
+			RTriangulation& Tri = solver->tesselation().Triangulation();
+        		FiniteCellsIterator cellEnd = Tri.finite_cells_end();
+			unsigned& id = vertexId;
+			if (vertexId >= solver->tesselation().vertexHandles.size()) LOG_ERROR("vertexId exceeds number of vertices");
+			vector<unsigned> incidentCells;
+			vector<CellHandle> tmpCells;
+			tmpCells.resize(10000);
+			typename FlowSolver::VCellIterator cells_it = tmpCells.begin();
+			typename FlowSolver::VCellIterator cells_end = Tri.incident_cells(solver->tesselation().vertexHandles[id],cells_it);
+			for (typename FlowSolver::VCellIterator it = tmpCells.begin(); it != cells_end; it++) incidentCells.push_back((*it)->info().id);
+			return incidentCells;
+		}
+		
 
 		void imposeFlux(Vector3r pos, Real flux);
 		unsigned int imposePressure(Vector3r pos, Real p);
@@ -388,6 +403,7 @@ class TemplateFlowEngine_@TEMPLATE_FLOW_NAME@ : public PartialEngine
 		.def("updateBCs",&TemplateFlowEngine_@TEMPLATE_FLOW_NAME@::updateBCs,"Update the boundary condition to reflect changes of boundary pressure (needed typically after changing :yref:`FlowEngine::bndCondValue`). It is not sufficient to reflect changes of the type of boundary condition (:yref:`FlowEngine::bndCondIsPressure`), in such case re-triangulation is needed (see :yref:`FlowEngine::updateTriangulation`). Conversely, the update is not necessary for point-wise imposed pressure (:yref:`FlowEngine::imposePressure`)")
 		.def("emulateAction",&TemplateFlowEngine_@TEMPLATE_FLOW_NAME@::emulateAction,"get scene and run action (may be used to manipulate an engine outside the timestepping loop).")
 		.def("getCell",&TemplateFlowEngine_@TEMPLATE_FLOW_NAME@::getCell,(boost::python::arg("pos")),"get id of the cell containing (X,Y,Z).")
+		.def("getIncidentCells",&TemplateFlowEngine_@TEMPLATE_FLOW_NAME@::getIncidentCells,(boost::python::arg("vertexId")),"get ids of all cells of which vertexId is a vertex. Typical usage is for getting cells indident to a boundary.")
 		.def("getCellBarycenter",&TemplateFlowEngine_@TEMPLATE_FLOW_NAME@::cellBarycenterFromId,(boost::python::arg("id")),"get barycenter of cell 'id'.")
 		.def("getCellCenter",&TemplateFlowEngine_@TEMPLATE_FLOW_NAME@::cellCenter,(boost::python::arg("id")),"get voronoi center of cell 'id'.")
 		.def("getCellPressure",&TemplateFlowEngine_@TEMPLATE_FLOW_NAME@::cellPressure,(boost::python::arg("id")),"get pressure in cell 'id'.")
