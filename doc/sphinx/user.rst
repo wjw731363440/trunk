@@ -1433,6 +1433,40 @@ While job is running, the batch system presents progress via simple HTTP server 
 
 	Summary page available at port 9080 as batch is processed (updates every 5 seconds automatically). Possible job statuses are pending, running, done, failed.
 
+Batch execution on Job-based clusters (OAR)
+===========================================
+
+On computation clusters, where there are already a scheduling system, the following script might be usefull. Exactly like yade-batch, it handles assignemnt of parameters value to python variables in simulation script from a parameter table, and job submission. This script is written for `oar-based <http://oar.imag.fr>`_ system , and may be extended to others ones. On those system, usually, a job can't run forever and has a specific duration allocation.
+The whole job submission consists of 3 files:
+
+Simulation script:
+	Regular Yade script, which calls :yref:`readParamsFromTable<yade.utils.readParamsFromTable>` to obtain parameters from parameter table. In order to make the script runnable outside the batch, :yref:`readParamsFromTable<yade.utils.readParamsFromTable>` takes default values of parameters, which might be overridden from the parameter table.
+	
+	:yref:`readParamsFromTable<yade.utils.readParamsFromTable>` knows which parameter file and which line to read by inspecting the ``PARAM_TABLE`` environment variable, set by the batch system.
+
+Parameter table:
+	Simple text file, each line representing one parameter set. This file is read by :yref:`readParamsFromTable<yade.utils.readParamsFromTable>` (using :yref:`TableParamReader<yade.utils.TableParamReader>` class), called from simulation script, as explained above. For better reading of the text file you can make use of tabulators, these will be ignored by :yref:`readParamsFromTable<yade.utils.readParamsFromTable>`. Parameters are not restricted to numerical values. You can also make use of strings by "quoting" them ('  ' may also be used instead of "  "). This can be useful for nominal parameters.
+	
+Job script:
+	Bash script, which call yade on computing nodes. This script eventually creates temp folders, save data to storage server etc. The script must be formatted as a template where some tags will be replaced by specific values at the execution time:
+	* __YADE_COMMAND__ will be replaced by actual yade run command
+	* __YADE_LOGFILE__ will be replaced by log file path (output to stdout)
+	* __YADE_ERRFILE__ will be replaced by error file path (output to stderr)
+	* __YADE_JOBNO__ will be replaced by a identifier composed as (launch script pid)-(job order)
+	* __YADE_JOBID__ will be replaced by a identifier composed of all parameters values
+
+The batch can be run as ::
+
+	yade-oar --oar-project=<your project name> --oar-script=job.sh --oar-walltime=hh:mm:ss parameters.table simulation.py
+
+and it will generate one launch script and submit one job for each parameter table line. A minimal example is found in :ysrc:`examples/oar/params.table` :ysrc:`examples/oar/job.sh` and :ysrc:`examples/oar/sim.py`.
+
+.. note::
+	You have to specify either --oar-walltime or a !WALLTIME column in params.table. !WALLTIME will override --oar-walltime
+	
+.. warning::
+	yade-oar is not compiled by default. Use -DENABLE_OAR=1 option to cmake to enable it.
+
 
 ***************
 Postprocessing
@@ -1467,7 +1501,7 @@ Saving data during the simulation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Paraview is based on the `Visualization Toolkit <http://www.vtk.org>`_, which defines formats for saving various types of data. One of them (with the ``.vtu`` extension) can be written by a special engine :yref:`VTKRecorder`. It is added to the simulation loop::
-
+ 
 	O.engines=[
 		# ...
 		VTKRecorder(iterPeriod=100,recorders=['spheres','facets','colors'],fileName='/tmp/p1-')

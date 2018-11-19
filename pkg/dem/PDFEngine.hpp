@@ -30,7 +30,7 @@ public:
 	virtual void action();
 	
 	YADE_CLASS_BASE_DOC_ATTRS_CTOR_PY(PDFEngine, PeriodicEngine,
-		"Base class for spectrums calculations. Should not be used directly. Compute Probability Density Functions in spherical coordinates and write result to a file.",
+		"Base class for spectrums calculations. Compute Probability Density Functions of normalStress, shearStress, distance, velocity and interactions in spherical coordinates and write result to a file. Column name format is: Data(theta, phi). Convention used: x: phi = 0, y: theta = 0, z: phi = pi/2",
 		((uint, numDiscretizeAngleTheta, 20,,"Number of sector for theta-angle"))
 		((uint, numDiscretizeAnglePhi, 40,,"Number of sector for phi-angle"))
 		//((Real, discretizeRadius, 0.1,,"d/a interval size"))
