@@ -110,17 +110,18 @@ class TemplateFlowEngine_@TEMPLATE_FLOW_NAME@ : public PartialEngine
 				return false;}
 			return true;}
 			
-		vector<unsigned> getIncidentCells(unsigned vertexId) {
+		boost::python::list getIncidentCells(unsigned vertexId) {
 			RTriangulation& Tri = solver->tesselation().Triangulation();
         		FiniteCellsIterator cellEnd = Tri.finite_cells_end();
 			unsigned& id = vertexId;
 			if (vertexId >= solver->tesselation().vertexHandles.size()) LOG_ERROR("vertexId exceeds number of vertices");
-			vector<unsigned> incidentCells;
+// 			vector<unsigned> incidentCells;
+			boost::python::list incidentCells;
 			vector<CellHandle> tmpCells;
 			tmpCells.resize(10000);
 			typename FlowSolver::VCellIterator cells_it = tmpCells.begin();
 			typename FlowSolver::VCellIterator cells_end = Tri.incident_cells(solver->tesselation().vertexHandles[id],cells_it);
-			for (typename FlowSolver::VCellIterator it = tmpCells.begin(); it != cells_end; it++) incidentCells.push_back((*it)->info().id);
+			for (typename FlowSolver::VCellIterator it = tmpCells.begin(); it != cells_end; it++) incidentCells.append((*it)->info().id);
 			return incidentCells;
 		}
 		
