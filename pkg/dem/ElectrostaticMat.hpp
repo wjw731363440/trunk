@@ -31,11 +31,12 @@ class ElectrostaticPhys: public LubricationPhys {
         public:
 				explicit ElectrostaticPhys(LubricationPhys const&); // Inheritance constructor
                 YADE_CLASS_BASE_DOC_ATTRS_CTOR_PY(ElectrostaticPhys,LubricationPhys,"IPhys class containing parameters of DLVO interaction Inherits from LubricationPhys. Used by :yref:`Law2_ScGeom_ElectrostaticPhys`.",
-                        ((Real,DebyeLength,1e-6,,"Debye Length $\\kappa^{-1}$[m]"))
-                        ((Real,Z,1e-12,,"Double layer interaction constant $Z$ [N]"))
-                        ((Real,A,1e-19,,"Hamaker constant $A = \\sqrt{A_1A_2}$ [J]"))
+                        ((Real,DebyeLength,1e-6,Attr::readonly,"Debye Length $\\kappa^{-1}$[m]"))
+                        ((Real,Z,1e-12,Attr::readonly,"Double layer interaction constant $Z$ [N]"))
+                        ((Real,A,1e-19,Attr::readonly,"Hamaker constant $A = \\sqrt{A_1A_2}$ [J]"))
 						((Real,vdw_cutoff, 1.e-4,,"Van der Waals cutoff ratio []"))
-						((Vector3r,normalDLVOForce,Vector3r::Zero(),,"Normal force due to DLVO interaction"))
+						((Vector3r,normalDLForce,Vector3r::Zero(),Attr::readonly,"Normal force due to Double Layer electrostatic repulsion"))
+						((Vector3r,normalVdWForce,Vector3r::Zero(),Attr::readonly,"Normal force due to Van-der-Waals attraction"))
 			, // ctors
                         createIndex();,
 		);
@@ -71,17 +72,17 @@ class Law2_ScGeom_ElectrostaticPhys: public Law2_ScGeom_ImplicitLubricationPhys{
 		Real DLVO_DichoAdimExp_integrate_u(Real const& un, Real const& eps, Real const& alpha, Real const& A, Real const& vdwcut, Real const& Z, Real const& K, Real & prevDotU, Real const& dt, Real const& prev_d, Real const& undot);
 		Real ObjF(Real const& un, Real const& eps, Real const& alpha, Real const& prevDotU, Real const& dt, Real const& prev_d, Real const& undot, Real const& A, Real const& vdwcut, Real const& Z, Real const& K, Real const& d);
 		
-		static void getStressForEachBody(vector<Matrix3r>& DLVOStresses);
+		static void getStressForEachBody(vector<Matrix3r>& DLStresses, vector<Matrix3r>& VdWStresses);
 		static py::tuple PyGetStressForEachBody();
-		static void getTotalStresses(Matrix3r& DLVOStresses);
+		static void getTotalStresses(Matrix3r& DLStresses, Matrix3r& VdWStresses);
 		static py::tuple PyGetTotalStresses();
 		
 		bool go(shared_ptr<IGeom>& iGeom, shared_ptr<IPhys>& iPhys, Interaction* interaction);
 		FUNCTOR2D(GenericSpheresContact,ElectrostaticPhys);
-		YADE_CLASS_BASE_DOC_ATTRS_CTOR_PY(Law2_ScGeom_ElectrostaticPhys,Law2_ScGeom_ImplicitLubricationPhys,"Material law for lubricated spheres with DLVO interaction between 2 spheres",,,
-			.def("getStressForEachBody",&Law2_ScGeom_ElectrostaticPhys::PyGetStressForEachBody,"Get stresses tensors for each bodies: normal contact stress, shear contact stress, normal lubrication stress, shear lubrication stress, DLVO stress.")
+		YADE_CLASS_BASE_DOC_ATTRS_CTOR_PY(Law2_ScGeom_ElectrostaticPhys,Law2_ScGeom_ImplicitLubricationPhys,"Material law for lubricated spheres with DLVO interaction between 2 spheres. Solved either by Newton-Rafson method (only Double-Layer repulsion) or dichotomy method (whole interaction). No exact resolution method available",,,
+			.def("getStressForEachBody",&Law2_ScGeom_ElectrostaticPhys::PyGetStressForEachBody,"Get stresses tensors for each bodies: normal contact stress, shear contact stress, normal lubrication stress, shear lubrication stress, DL stress, VdWStress.")
 			.staticmethod("getStressForEachBody")
-			.def("getTotalStresses",&Law2_ScGeom_ElectrostaticPhys::PyGetTotalStresses,"Get total stresses tensors: normal contact stress, shear contact stress, normal lubrication stress, shear lubrication stress, DLVO stress")
+			.def("getTotalStresses",&Law2_ScGeom_ElectrostaticPhys::PyGetTotalStresses,"Get total stresses tensors: normal contact stress, shear contact stress, normal lubrication stress, shear lubrication stress, DL stress, VdW Stress")
 			.staticmethod("getTotalStresses")
 		);
 		DECLARE_LOGGER;

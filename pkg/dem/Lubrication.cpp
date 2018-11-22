@@ -70,6 +70,8 @@ void Ip2_FrictMat_FrictMat_LubricationPhys::go(const shared_ptr<Material> &mater
 }
 CREATE_LOGGER(Ip2_FrictMat_FrictMat_LubricationPhys);
 
+
+// Force calculation with variable change, dimentionless
 Real Law2_ScGeom_ImplicitLubricationPhys::normalForce_AdimExp(LubricationPhys *phys, ScGeom* geom, Real undot, bool isNew, bool dichotomie)
 {
 	// Dry contact
@@ -81,7 +83,7 @@ Real Law2_ScGeom_ImplicitLubricationPhys::normalForce_AdimExp(LubricationPhys *p
 	Real a((geom->radius1+geom->radius2)/2.);
 	if(isNew) { phys->u = -geom->penetrationDepth; 
 		if(phys->u < 0.)
-			LOG_ERROR("phys->u < 0 at starting point!!!");
+			LOG_ERROR("phys->u < 0 at starting point!!! Increase interaction detection distance.");
 		phys->delta = std::log(phys->u/a); }
 	
 	Real d;
@@ -103,6 +105,7 @@ Real Law2_ScGeom_ImplicitLubricationPhys::normalForce_AdimExp(LubricationPhys *p
 	return phys->u;
 }
 
+// Dimentionless Newton-Rafson solver
 Real Law2_ScGeom_ImplicitLubricationPhys::NRAdimExp_integrate_u(Real const& un, Real const& eps, Real const& alpha, Real & prevDotU, Real const& dt, Real const& prev_d, Real const& undot, int depth)
 {
 	Real d = prev_d;
@@ -110,8 +113,7 @@ Real Law2_ScGeom_ImplicitLubricationPhys::NRAdimExp_integrate_u(Real const& un, 
 	int i;
 	Real a(0), F;
 	
-	for(i=0;i<MaxIter;i++)
-	{
+	for(i=0;i<MaxIter;i++) {
 		a = (std::exp(d) < eps) ? alpha : 0.; // Alpha = 0 for non-contact
 		
 		Real ratio = (dt*(theta*(-(1.+a)*std::exp(d) + a*eps + un) + (1.-theta)*std::exp(prev_d - d)*prevDotU) - 1. + std::exp(prev_d - d))/(dt*theta*(-2.*(1.+a)*std::exp(d) + a*eps + un) - 1.);
@@ -138,41 +140,33 @@ Real Law2_ScGeom_ImplicitLubricationPhys::NRAdimExp_integrate_u(Real const& un, 
 	}
 }
 
+// Dimentionless dichotomy solver
 Real Law2_ScGeom_ImplicitLubricationPhys::DichoAdimExp_integrate_u(Real const& un, Real const& eps, Real const& alpha, Real & prevDotU, Real const& dt, Real const& prev_d, Real const& undot)
 {
 	Real F = 0.;
-	Real d_left(prev_d), d_right(prev_d), F_left(F), F_right(F);
+	Real d_left(prev_d-1.), d_right(prev_d+1.);
+	Real F_left(ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, d_left));
+	Real F_right(ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, d_right));
 	Real d;
 	
 	// Init: search for interval that contain sign change
-	while(F_left*F_right >= 0.)
-	{
-		d_left--;
-		d_right++;
+	Real inc = (F_left < 0.) ? 1. : -1;
+	inc = (F_left < F_right) ? inc : -inc;
+	while(F_left*F_right >= 0.) {
+		d_left += inc;
+		d_right += inc;
 		F_left = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, d_left);
 		F_right = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, d_right);
-		
-		if(!std::isfinite(d_left) || !std::isfinite(d_right))
-		{
-			LOG_ERROR("UNABLE to find starting point d_left=" << d_left << " F_left=" << F_left << " d_right=" << d_right << " F_right=" << F_right << " prev_d=" << prev_d);
-			break;
-		}
 	}
 	
-	if(verbose) LOG_ERROR("starting point ::  d_left=" << d_left << " F_left=" << F_left << " d_right=" << d_right << " F_right=" << F_right << " prev_d=" << prev_d);
+	if(debug && (!std::isfinite(F_left) || !std::isfinite(F_right)))
+		LOG_ERROR("Initial point problem!! d_left=" << d_left << " F_left=" << F_left << " d_right=" << d_right << " F_right=" << F_right);
 	
 	// Iterate to find the zero.
 	int i;
-	for(i=0;i<MaxIter;i++)
-	{
+	for(i=0;i<MaxIter;i++) {
 		if(F_left*F_right > 0.)
 			LOG_ERROR("Both function have same sign!! d_left=" << d_left << " F_left=" << F_left << " d_right=" << d_right << " F_right=" << F_right);
-		
-		if(!std::isfinite(d_left) || !std::isfinite(d_right))
-		{
-			LOG_ERROR("WTF!! d_left=" << d_left << " F_left=" << F_left << " d_right=" << d_right << " F_right=" << F_right << " prev_d=" << prev_d);
-			break;
-		}
 		
 		d = (d_left + d_right)/2.;	
 		F = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, d);
@@ -180,13 +174,10 @@ Real Law2_ScGeom_ImplicitLubricationPhys::DichoAdimExp_integrate_u(Real const& u
 		if(std::abs(F) < SolutionTol)
 			break;
 		
-		if(F*F_left < 0.)
-		{
+		if(F*F_left < 0.) {
 			F_right = F;
 			d_right = d;
-		}
-		else
-		{
+		} else {
 			F_left = F;
 			d_left = d;
 		}
@@ -212,54 +203,7 @@ template <typename T> int sign(T val) {
     return (int)(T(0) < val) - (val < T(0));
 }
 
-
-Real Law2_ScGeom_ImplicitLubricationPhys::normalForce_NewtonRafson(LubricationPhys *phys, ScGeom* geom, Real undot, bool isNew)
-{
-	if(isNew) { phys->u = -geom->penetrationDepth-undot*scene->dt; }
-	
-	Real a((geom->radius1+geom->radius2)/2.);
-	Real u = newton_integrate_u(-geom->penetrationDepth, phys->nun, scene->dt, phys->kno, phys->kn, phys->u, 2.*a*phys->eps);
-	
-	phys->normalForce = phys->kn*(-geom->penetrationDepth-u)*geom->normal;
-	phys->normalContactForce = (phys->nun > 0.) ? Vector3r(-phys->kno*std::pow(std::max((2.*a*phys->eps-u),0.),3./2.)*geom->normal) : phys->normalForce;
-	phys->normalLubricationForce = phys->normalForce - phys->normalContactForce;
-	//phys->normalLubricationForce = phys->nun*(u - phys->u)/(scene->dt*u)*geom->normal;
-	phys->u = u;
-	phys->contact = phys->normalContactForce.norm() != 0;
-	phys->ue = -geom->penetrationDepth - phys->u;
-	
-	return u;
-}
-
-Real Law2_ScGeom_ImplicitLubricationPhys::newton_integrate_u(Real const& un, Real const& nu, Real const& dt, Real const& k, Real const& g, Real const& u_prev, Real const& eps, int depth)
-{
-	Real u = u_prev;
-	
-	int i;
-	for(i = 0;i<MaxIter;i++)
-	{
-		Real const keff = (u < eps) ? k*std::pow(eps-u,1./2.) : 0.;
-		
-		Real F = u*(g*(un-u) + keff*(eps-u)) - nu*(u-u_prev)/dt;
-		u = u - F/((g*(un-u) + keff*(eps-u)) - u*(g+3./2.*keff) - nu/dt);
-		
-		if(debug) LOG_DEBUG(" u " << u << " F " << F << " contact  " << (u < eps) << " i " << i << " depth " << depth);
-		
-		if(std::abs(F)<SolutionTol)
-			break;
-	}
-
-	if((i < MaxIter && u > 0.) || depth > maxSubSteps) {
-		if(depth > MaxIter) LOG_WARN("Maximum Newton-Rafson iterations/substepping reach. Results may be inconsistant.");
-		return u;
-	} else {
-		// Substepping
-		Real u_mid = newton_integrate_u(un,nu,dt/2.,k,g,u_prev,eps,depth+1);
-		return newton_integrate_u(un,nu,dt/2.,k,g,u_mid,eps,depth+1);
-	}
-}
-
-
+// Exact solution
 Real Law2_ScGeom_ImplicitLubricationPhys::normalForce_trapezoidal(LubricationPhys *phys, ScGeom* geom, Real undot, bool isNew)
 {
 	Real a((geom->radius1+geom->radius2)/2.);
@@ -279,7 +223,7 @@ Real Law2_ScGeom_ImplicitLubricationPhys::normalForce_trapezoidal(LubricationPhy
 	return phys->u;
 }
 
-
+// Exact solution solver
 Real Law2_ScGeom_ImplicitLubricationPhys::trapz_integrate_u(Real& prevDotU, Real& un_prev, Real& u_prev, Real un_curr,
 						      const Real& nu, Real k, const Real& keps, const Real& eps, 
 						      Real dt, bool withContact, int depth)
@@ -337,6 +281,7 @@ Real Law2_ScGeom_ImplicitLubricationPhys::trapz_integrate_u(Real& prevDotU, Real
 		return k*(un_curr-u);}
 }
 
+// Compute shear force from exact resolution
 void Law2_ScGeom_ImplicitLubricationPhys::shearForce_firstOrder(LubricationPhys* phys, ScGeom* geom)
 {
 	Vector3r Ft(Vector3r::Zero());
@@ -354,13 +299,11 @@ void Law2_ScGeom_ImplicitLubricationPhys::shearForce_firstOrder(LubricationPhys*
 	phys->slip = false;
 	
 	// Also work without fluid (nut == 0)
-	if(phys->contact)
-	{
+	if(phys->contact) {
 		Ft = Ft_ + kt*dus; // Trial force
 		phys->shearContactForce = Ft; // If no slip: no lubrication!
 #if 1
-		if(Ft.norm() > phys->normalContactForce.norm()*std::max(0.,phys->mum)) // If slip
-		{
+		if(Ft.norm() > phys->normalContactForce.norm()*std::max(0.,phys->mum)) { // If slip
 			//LOG_INFO("SLIP");
 			Ft *= phys->normalContactForce.norm()*std::max(0.,phys->mum)/Ft.norm();
 			phys->shearContactForce = Ft;
@@ -369,9 +312,7 @@ void Law2_ScGeom_ImplicitLubricationPhys::shearForce_firstOrder(LubricationPhys*
 			phys->shearLubricationForce = nut*dus/scene->dt;
 		}
 #endif
-	}
-	else
-	{
+	} else {
 		Ft = (Ft_ + dus*kt)*nut/(nut+kt*scene->dt);
 		phys->shearLubricationForce = Ft;
 	}
@@ -379,6 +320,7 @@ void Law2_ScGeom_ImplicitLubricationPhys::shearForce_firstOrder(LubricationPhys*
 	phys->shearForce = Ft;
 }
 
+// Compute shearforce from adim-log resolution
 void Law2_ScGeom_ImplicitLubricationPhys::shearForce_firstOrder_log(LubricationPhys* phys, ScGeom* geom)
 {
 	Vector3r Ft(Vector3r::Zero());
@@ -467,30 +409,27 @@ bool Law2_ScGeom_ImplicitLubricationPhys::go(shared_ptr<IGeom> &iGeom, shared_pt
     phys->normalContactForce = Vector3r::Zero();
     phys->normalLubricationForce = Vector3r::Zero();
 	
-    if(activateNormalLubrication)
-    {
+    if(activateNormalLubrication) {
 		switch(resolution) {
 			case 0: normalForce_trapezoidal(phys,geom, undot, isNew); break;
 			case 1: normalForce_AdimExp(phys, geom, undot, isNew, false); break;
-			case 2: normalForce_NewtonRafson(phys, geom, undot, isNew); break;
-			case 3: normalForce_AdimExp(phys, geom, undot, isNew, true); break;
+			case 2: normalForce_AdimExp(phys, geom, undot, isNew, true); break;
 			default:
-			LOG_WARN("Nonexistant resolution method. Using exact (0).");
-			normalForce_trapezoidal(phys,geom, undot, isNew); break;
+				LOG_WARN("Nonexistant resolution method. Using exact (0).");
+				normalForce_trapezoidal(phys,geom, undot, isNew);
+				resolution = 0; break;
 		}
-	}
-	else
-	{
+	} else {
 		phys->u = -geom->penetrationDepth;
 	}
 	
 	Vector3r C1 = Vector3r::Zero();
 	Vector3r C2 = Vector3r::Zero();
 	
-	if(resolution == 1)
-		computeShearForceAndTorques_log(phys, geom, s1, s2, C1, C2);
-	else
+	if(resolution == 0)
 		computeShearForceAndTorques(phys, geom, s1, s2, C1, C2);
+	else
+		computeShearForceAndTorques_log(phys, geom, s1, s2, C1, C2);
 	
     // Apply!
     scene->forces.addForce(id1,phys->normalForce+phys->shearForce);
@@ -502,11 +441,11 @@ bool Law2_ScGeom_ImplicitLubricationPhys::go(shared_ptr<IGeom> &iGeom, shared_pt
     return true;
 }
 
+// Compute shear force and torques from linear
 void Law2_ScGeom_ImplicitLubricationPhys::computeShearForceAndTorques(LubricationPhys *phys, ScGeom* geom, State * s1, State *s2, Vector3r & C1, Vector3r & C2)
 {
 	Real a((geom->radius1+geom->radius2)/2.);
-	if(phys->eta <= 0. || phys->u > 0.)
-	{
+	if(phys->eta <= 0. || phys->u > 0.) {
 		if(activateTangencialLubrication) shearForce_firstOrder(phys,geom);
 		else {phys->shearForce = Vector3r::Zero(); phys->shearContactForce = Vector3r::Zero(); phys->shearLubricationForce = Vector3r::Zero();}
 		
@@ -526,18 +465,16 @@ void Law2_ScGeom_ImplicitLubricationPhys::computeShearForceAndTorques(Lubricatio
 	    // total torque
 		C1 = -(geom->radius1-geom->penetrationDepth/2.)*phys->shearForce.cross(geom->normal)+Cr+Ct;
 		C2 = -(geom->radius2-geom->penetrationDepth/2.)*phys->shearForce.cross(geom->normal)-Cr-Ct;
-	}
-	else
-	{
+	} else {
 		LOG_WARN("Gap is negative or null with lubrication: inconsistant results: skip shear force and torques calculation");
 	}
 }
 
-
+// Compute shear force and torques from adim-log
 void Law2_ScGeom_ImplicitLubricationPhys::computeShearForceAndTorques_log(LubricationPhys *phys, ScGeom* geom, State * s1, State *s2, Vector3r & C1, Vector3r & C2)
 {
 	Real a((geom->radius1+geom->radius2)/2.);
-	if(resolution != 1 && resolution != 3 && debug && !warnedOnce) { LOG_DEBUG("This method use log(u/a) for shear and torque component calculation. Make sure phys->delta is set before calling this method."); warnedOnce = true; }
+	if(resolution == 1 && debug && !warnedOnce) { LOG_DEBUG("This method use log(u/a) for shear and torque component calculation. Make sure phys->delta is set before calling this method."); warnedOnce = true; }
 		
 	if(activateTangencialLubrication) shearForce_firstOrder_log(phys,geom);
 	else {phys->shearForce = Vector3r::Zero(); phys->shearContactForce = Vector3r::Zero(); phys->shearLubricationForce = Vector3r::Zero();}
@@ -569,20 +506,20 @@ void Law2_ScGeom_ImplicitLubricationPhys::getStressForEachBody(vector<Matrix3r>&
 	SCStresses.resize(scene->bodies->size());
 	NLStresses.resize(scene->bodies->size());
 	SLStresses.resize(scene->bodies->size());
-	for (size_t k=0;k<scene->bodies->size();k++)
-	{
+	
+	for (size_t k=0;k<scene->bodies->size();k++) {
 		NCStresses[k]=Matrix3r::Zero();
 		SCStresses[k]=Matrix3r::Zero();
 		NLStresses[k]=Matrix3r::Zero();
 		SLStresses[k]=Matrix3r::Zero();
 	}
-	FOREACH(const shared_ptr<Interaction>& I, *scene->interactions){
+	
+	FOREACH(const shared_ptr<Interaction>& I, *scene->interactions) {
 		if(!I->isReal()) continue;
 		GenericSpheresContact* geom=YADE_CAST<GenericSpheresContact*>(I->geom.get());
 		LubricationPhys* phys=YADE_CAST<LubricationPhys*>(I->phys.get());
 		
-		if(phys)
-		{
+		if(phys) {
 			Vector3r lV1 = (3.0/(4.0*Mathr::PI*pow(geom->refR1,3)))*((geom->contactPoint-Body::byId(I->getId1(),scene)->state->pos));
 			Vector3r lV2 = Vector3r::Zero();
 			if (!scene->isPeriodic)
@@ -621,18 +558,15 @@ void Law2_ScGeom_ImplicitLubricationPhys::getTotalStresses(Matrix3r& NCStresses,
     
   	const shared_ptr<Scene>& scene=Omega::instance().getScene();
     
-    if(!scene->isPeriodic)
-    {
+    if(!scene->isPeriodic) {
         LOG_ERROR("This method can only be used in periodic simulations");
         return;
     }
     
-    for(unsigned int i(0);i<NCs.size();i++)
-    {
+    for(unsigned int i(0);i<NCs.size();i++) {
         Sphere * s = YADE_CAST<Sphere*>(Body::byId(i,scene)->shape.get());
         
-        if(s)
-        {
+        if(s) {
             Real vol = 4./3.*M_PI*pow(s->radius,3);
             
             NCStresses += NCs[i]*vol;

@@ -23,11 +23,15 @@ class LubricationPhys: public ViscElPhys {
 //                 LubricationPhys(ViscElPhys const& ); // "copy" constructor
                 virtual ~LubricationPhys();
                 YADE_CLASS_BASE_DOC_ATTRS_CTOR_PY(LubricationPhys,ViscElPhys,"IPhys class for Lubrication w/o FlowEngine. Used by Law2_ScGeom_ImplicitLubricationPhys.",
+												  
+				// Physical properties
                 ((Real,eta,1,Attr::readonly,"Fluid viscosity [Pa.s]"))
                 ((Real,eps,0.001,,"Roughness: fraction of radius used as roughness [-]"))
                 ((Real,kno,0.0,,"Coefficient for normal stiffness (Hertzian-like contact) [N/m^(3/2)]"))
                 ((Real,nun,0.0,,"Coefficient for normal lubrication [N.s]"))
                 ((Real,mum,0.3,,"Friction coefficient [-]"))
+				
+				// Output
                 ((Real,ue,0.,Attr::readonly,"Surface deflection (ue) at t-dt [m]"))
                 ((Real,u,-1,Attr::readonly,"Interfacial distance (u) at t-dt [m]"))
 				((Real,prev_un,0,Attr::readonly,"Nondeformed distance (un) at t-dt [m]"))
@@ -78,9 +82,9 @@ class Law2_ScGeom_ImplicitLubricationPhys: public LawFunctor{
 							Real dt, bool withContact, int depth=0);
 		
 			Real normalForce_trapezoidal(LubricationPhys *phys, ScGeom* geom, Real undot, bool isNew /* FIXME: delete those variables */);
-			
-			Real normalForce_NewtonRafson(LubricationPhys *phys, ScGeom* geom, Real undot, bool isNew);
-			Real newton_integrate_u(Real const& un, Real const& nu, Real const& dt, Real const& k, Real const& g, Real const& u_prev, Real const& eps, int depth=0);
+
+			//Real normalForce_NewtonRafson(LubricationPhys *phys, ScGeom* geom, Real undot, bool isNew);
+			//Real newton_integrate_u(Real const& un, Real const& nu, Real const& dt, Real const& k, Real const& g, Real const& u_prev, Real const& eps, int depth=0);
 			
 			Real normalForce_AdimExp(LubricationPhys *phys, ScGeom* geom, Real undot, bool isNew, bool dichotomie);
 			Real NRAdimExp_integrate_u(Real const& un, Real const& eps, Real const& alpha, Real & prevDotU, Real const& dt, Real const& prev_d, Real const& undot, int depth=0);
@@ -96,7 +100,7 @@ class Law2_ScGeom_ImplicitLubricationPhys: public LawFunctor{
 		
                 YADE_CLASS_BASE_DOC_ATTRS_CTOR_PY(Law2_ScGeom_ImplicitLubricationPhys,
 			LawFunctor,
-			"Material law for lubrication and contact between two spheres, resolved implicitly.",
+			"Material law for lubrication and contact between two spheres, resolved implicitly. Several resolution methods are available. Iterative exact, solving the 2nd order polynomia. Other resolutions methods are numerical (Newton-Rafson and Dichotomy) with a variable change $\\delta=\\log(u)$, solved in dimentionless coordinates.",
 			// ATTR
 			((bool,warnedOnce,false,, "some warnings will appear only once, turn this flag false to see them again"))
 			((bool,activateNormalLubrication,true,,"Activate normal lubrication (default: true)"))
@@ -107,9 +111,9 @@ class Law2_ScGeom_ImplicitLubricationPhys: public LawFunctor{
 			((bool,verbose,false,,"Write more debug informations"))
 			((int,maxSubSteps,4,,"max recursion depth of adaptative timestepping in the theta-method, the minimal time interval is thus :yref:`Omega::dt<O.dt>`$/2^{depth}$. If still not converged the integrator will switch to backward Euler."))
 			((Real,theta,0.55,,"parameter of the 'theta'-method, 1: backward Euler, 0.5: trapezoidal rule, 0: not used,  0.55: suggested optimum)"))
-			((int,resolution,0,,"Change normal component resolution method, 0: Iterative exact resolution (theta method, linear contact), 1: Newton-Rafson dimentionless resolution (theta method, linear contact), 2: Newton-Rafson with nonlinear surface deflection (Hertzian-like contact), 3: Dichotomy dimentionless resolution (theta method, linear contact)"))
-			((Real, SolutionTol, 1.e-10,,"Tolerance for numerical resolution"))
-			((int, MaxIter, 30,,"Maximum iterations for numerical resolution"))
+			((int,resolution,2,,"Change normal component resolution method, 0: Iterative exact resolution with substepping (theta method, linear contact), 1: Newton-Rafson dimentionless resolution (theta method, linear contact), 2: (default) Dichotomy dimentionless resolution (theta method, linear contact)"))
+			((Real, SolutionTol, 1.e-8,,"Tolerance for numerical resolution (Dichotomy and Newton-Rafson)"))
+			((int, MaxIter, 30,,"Maximum iterations for numerical resolution (Dichotomy and Newton-Rafson)"))
 			,// CTOR
 			,// PY
 			.def("getStressForEachBody",&Law2_ScGeom_ImplicitLubricationPhys::PyGetStressForEachBody,"Get stresses tensors for each bodies: normal contact stress, shear contact stress, normal lubrication stress, shear lubrication stress.")

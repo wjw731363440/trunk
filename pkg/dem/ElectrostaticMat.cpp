@@ -16,6 +16,7 @@ ElectrostaticPhys::ElectrostaticPhys(LubricationPhys const& obj) :
 
 CREATE_LOGGER(ElectrostaticPhys);
 
+// Calculation on interaction constant based on physical properties
 Real Ip2_ElectrostaticMat_ElectrostaticMat_ElectrostaticPhys::getInteractionConstant(Real const& epsr, Real const& T, Real const& z, Real const& phi0)
 {
 	// Physical constants
@@ -75,7 +76,8 @@ Real Law2_ScGeom_ElectrostaticPhys::normalForce_DLVO_Adim(ElectrostaticPhys* phy
 	
 	Real u_vdw = (std::exp(d) < phys->vdw_cutoff) ? 1./(phys->vdw_cutoff*phys->vdw_cutoff) : std::exp(-2.*d);
 	
-	phys->normalDLVOForce = (phys->A/(6.*a)*u_vdw - phys->Z*a/phys->DebyeLength*std::exp(-a*std::exp(d)/phys->DebyeLength))*geom->normal;
+	phys->normalDLForce = (- phys->Z*a/phys->DebyeLength*std::exp(-a*std::exp(d)/phys->DebyeLength))*geom->normal;
+	phys->normalVdWForce = ((dicho) ? Vector3r((phys->A/(6.*a)*u_vdw)*geom->normal) : Vector3r::Zero());
 	phys->normalLubricationForce = phys->kn*a*phys->prevDotU*geom->normal;
 	
 	phys->delta = d;
@@ -87,6 +89,7 @@ Real Law2_ScGeom_ElectrostaticPhys::normalForce_DLVO_Adim(ElectrostaticPhys* phy
 	return phys->u;
 }
 
+// Dimentionless Newton-Rafson solver
 Real Law2_ScGeom_ElectrostaticPhys::DLVO_NRAdimExp_integrate_u(Real const& un, Real const& eps, Real const& alpha, Real const& A, Real const& vdwc, Real const& Z, Real const& K, Real & prevDotU, Real const& dt, Real const& prev_d, Real const& undot, int depth)
 {
 	Real d = prev_d;
@@ -94,14 +97,13 @@ Real Law2_ScGeom_ElectrostaticPhys::DLVO_NRAdimExp_integrate_u(Real const& un, R
 	int i;
 	Real a(0), F;
 	
-	for(i=0;i<MaxIter;i++)
-	{
+	for(i=0;i<MaxIter;i++) {
 		a = (std::exp(d) < eps) ? alpha : 0.; // Alpha = 0 for non-contact
 /*
 		Real ratio = (theta*(un - std::exp(d)*(1.+a) + a*eps + K*Z*std::exp(-K*std::exp(d)) - A*std::exp(-2.*d)) + ((1.-theta)*prevDotU + 1./dt)*std::exp(prev_d-d) - 1./dt)/(theta*(un - 2.*(1.+a)*std::exp(d) + a*eps + (1.-K*std::exp(d))*K*Z*std::exp(-K*std::exp(d)) + A*std::exp(-2.*d)) - 1./dt);
 		
 		Real F = theta*(std::exp(d)*(un - (1.+a)*std::exp(d) + a*eps + Z*K*std::exp(-K*std::exp(d))) - A*std::exp(-d)) + (1.-theta)*prevDotU + 1./dt*(std::exp(prev_d) - std::exp(d));
-		//*/
+		//*/ // Unable to make that sh*t work, because of diverging attractiveness of VdW Forces
 		//*
 		Real ratio = (theta*(un - std::exp(d)*(1.+a) + a*eps + K*Z*std::exp(-K*std::exp(d))) + ((1.-theta)*prevDotU + 1./dt)*std::exp(prev_d-d) - 1./dt)/(theta*(un - 2.*(1.+a)*std::exp(d) + a*eps + (1.-K*std::exp(d))*K*Z*std::exp(-K*std::exp(d))) - 1./dt);
 		
@@ -129,6 +131,7 @@ Real Law2_ScGeom_ElectrostaticPhys::DLVO_NRAdimExp_integrate_u(Real const& un, R
 	}
 }
 
+// Dimentionless Dichotomy solver
 Real Law2_ScGeom_ElectrostaticPhys::DLVO_DichoAdimExp_integrate_u(Real const& un, Real const& eps, Real const& alpha, Real const& A, Real const& vdwc, Real const& Z, Real const& K, Real & prevDotU, Real const& dt, Real const& prev_d, Real const& undot)
 {
 	Real F = 0.;
@@ -138,24 +141,13 @@ Real Law2_ScGeom_ElectrostaticPhys::DLVO_DichoAdimExp_integrate_u(Real const& un
 	Real d;
 	
 	// Init: search for interval that contain sign change
-	if(F_left*F_right >= 0.) {
-		if(F_left < F_right) { // Increasing function
-			Real inc = (F_left < 0.) ? 1. : -1;
-			while(F_left*F_right >= 0.) {
-				d_left += inc;
-				d_right += inc;
-				F_left = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, A, vdwc, Z, K, d_left);
-				F_right = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, A, vdwc, Z, K, d_right);
-			}
-		} else { // Decreasing function
-			Real inc = (F_left < 0.) ? -1. : 1;
-			while(F_left*F_right >= 0.) {
-				d_left += inc;
-				d_right += inc;
-				F_left = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, A, vdwc, Z, K, d_left);
-				F_right = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, A, vdwc, Z, K, d_right);
-			}
-		}
+	Real inc = (F_left < 0.) ? 1. : -1;
+	inc = (F_left < F_right) ? inc : -inc;
+	while(F_left*F_right >= 0.) {
+		d_left += inc;
+		d_right += inc;
+		F_left = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, A, vdwc, Z, K, d_left);
+		F_right = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, A, vdwc, Z, K, d_right);
 	}
 	
 	if(debug && (!std::isfinite(F_left) || !std::isfinite(F_right)))
@@ -163,8 +155,7 @@ Real Law2_ScGeom_ElectrostaticPhys::DLVO_DichoAdimExp_integrate_u(Real const& un
 	
 	// Iterate to find the zero.
 	int i;
-	for(i=0;i<MaxIter;i++)
-	{
+	for(i=0;i<MaxIter;i++) {
 		if(F_left*F_right > 0.)
 			LOG_ERROR("Both function have same sign!! d_left=" << d_left << " F_left=" << F_left << " d_right=" << d_right << " F_right=" << F_right);
 		
@@ -175,13 +166,10 @@ Real Law2_ScGeom_ElectrostaticPhys::DLVO_DichoAdimExp_integrate_u(Real const& un
 		if(std::abs(F) < SolutionTol)
 			break;
 		
-		if(F*F_left < 0.)
-		{
+		if(F*F_left < 0.) {
 			F_right = F;
 			d_right = d;
-		}
-		else
-		{
+		} else {
 			F_left = F;
 			d_left = d;
 		}
@@ -239,13 +227,12 @@ bool Law2_ScGeom_ElectrostaticPhys::go(shared_ptr<IGeom>& iGeom, shared_ptr<IPhy
 	
 	// Solve normal
 	
-	if(resolution != 1 && resolution != 3)
-	{
-		LOG_WARN("Resolution method must be 1 (Newton-Rafson) or 3 (Dichotomy). Using Dichotomy.");
-		resolution = 3;
+	if(resolution != 1 && resolution != 2) {
+		LOG_WARN("Resolution method must be 1 (Newton-Rafson) or 2 (Dichotomy). Using Dichotomy.");
+		resolution = 2;
 	}
 	
-	normalForce_DLVO_Adim(phys,geom, undot,isNew, resolution == 3);
+	normalForce_DLVO_Adim(phys,geom, undot,isNew, resolution == 2);
 	
 	// Solve shear and torques
 	Vector3r C1 = Vector3r::Zero();
@@ -263,22 +250,22 @@ bool Law2_ScGeom_ElectrostaticPhys::go(shared_ptr<IGeom>& iGeom, shared_ptr<IPhy
     return true;
 }
 
-void Law2_ScGeom_ElectrostaticPhys::getStressForEachBody(vector<Matrix3r>& DLVOStresses)
+void Law2_ScGeom_ElectrostaticPhys::getStressForEachBody(vector<Matrix3r>& DLStresses, vector<Matrix3r>& VdWStresses)
 {
 	const shared_ptr<Scene>& scene=Omega::instance().getScene();
-	DLVOStresses.resize(scene->bodies->size());
-	for (size_t k=0;k<scene->bodies->size();k++)
-	{
-		DLVOStresses[k]=Matrix3r::Zero();
+	DLStresses.resize(scene->bodies->size());
+	VdWStresses.resize(scene->bodies->size());
+	for (size_t k=0;k<scene->bodies->size();k++) {
+		DLStresses[k]=Matrix3r::Zero();
+		VdWStresses[k]=Matrix3r::Zero();
 	}
 	
-	FOREACH(const shared_ptr<Interaction>& I, *scene->interactions){
+	FOREACH(const shared_ptr<Interaction>& I, *scene->interactions) {
 		if(!I->isReal()) continue;
 		GenericSpheresContact* geom=YADE_CAST<GenericSpheresContact*>(I->geom.get());
 		ElectrostaticPhys* phys=YADE_CAST<ElectrostaticPhys*>(I->phys.get());
 		
-		if(phys)
-		{
+		if(phys) {
 			Vector3r lV1 = (3.0/(4.0*Mathr::PI*pow(geom->refR1,3)))*((geom->contactPoint-Body::byId(I->getId1(),scene)->state->pos));
 			Vector3r lV2 = Vector3r::Zero();
 			if (!scene->isPeriodic)
@@ -286,61 +273,66 @@ void Law2_ScGeom_ElectrostaticPhys::getStressForEachBody(vector<Matrix3r>& DLVOS
 			else
 				lV2 = (3.0/(4.0*Mathr::PI*pow(geom->refR2,3)))*((geom->contactPoint- (Body::byId(I->getId2(),scene)->state->pos + (scene->cell->hSize*I->cellDist.cast<Real>()))));
 
-			DLVOStresses[I->getId1()] += phys->normalDLVOForce*lV1.transpose();
-			DLVOStresses[I->getId2()] -= phys->normalDLVOForce*lV2.transpose();
+			DLStresses[I->getId1()] += phys->normalDLForce*lV1.transpose();
+			DLStresses[I->getId2()] -= phys->normalDLForce*lV2.transpose();
+			VdWStresses[I->getId1()] += phys->normalVdWForce*lV1.transpose();
+			VdWStresses[I->getId2()] -= phys->normalVdWForce*lV2.transpose();
 		}
 	}
 }
 
 py::tuple Law2_ScGeom_ElectrostaticPhys::PyGetStressForEachBody()
 {
-	py::list nc, sc, nl, sl, nd;
-	vector<Matrix3r> NCs, SCs, NLs, SLs, NDs;
+	py::list nc, sc, nl, sl, nd, nv;
+	vector<Matrix3r> NCs, SCs, NLs, SLs, NDs, NVs;
 	Law2_ScGeom_ImplicitLubricationPhys::getStressForEachBody(NCs, SCs, NLs, SLs);
-	getStressForEachBody(NDs);
+	getStressForEachBody(NDs, NVs);
 	FOREACH(const Matrix3r& m, NCs) nc.append(m);
 	FOREACH(const Matrix3r& m, SCs) sc.append(m);
 	FOREACH(const Matrix3r& m, NLs) nl.append(m);
 	FOREACH(const Matrix3r& m, SLs) sl.append(m);
 	FOREACH(const Matrix3r& m, NDs) nd.append(m);
-	return py::make_tuple(nc, sc, nl, sl, nd);
+	FOREACH(const Matrix3r& m, NVs) nv.append(m);
+	return py::make_tuple(nc, sc, nl, sl, nd, nv);
 }
 
-void Law2_ScGeom_ElectrostaticPhys::getTotalStresses(Matrix3r& DLVOStresses)
+void Law2_ScGeom_ElectrostaticPhys::getTotalStresses(Matrix3r& DLStresses, Matrix3r& VdWStresses)
 {
-	vector<Matrix3r> NDs;
-	getStressForEachBody(NDs);
+	vector<Matrix3r> NDs, NVs;
+	getStressForEachBody(NDs, NVs);
+	
+	DLStresses = Matrix3r::Zero();
+	VdWStresses = Matrix3r::Zero();
     
   	const shared_ptr<Scene>& scene=Omega::instance().getScene();
     
-    if(!scene->isPeriodic)
-    {
+    if(!scene->isPeriodic) {
         LOG_ERROR("This method can only be used in periodic simulations");
         return;
     }
     
-    for(unsigned int i(0);i<NDs.size();i++)
-    {
+    for(unsigned int i(0);i<NDs.size();i++) {
         Sphere * s = YADE_CAST<Sphere*>(Body::byId(i,scene)->shape.get());
         
-        if(s)
-        {
+        if(s) {
             Real vol = 4./3.*M_PI*pow(s->radius,3);
             
-            DLVOStresses += NDs[i]*vol;
+            DLStresses += NDs[i]*vol;
+            VdWStresses += NVs[i]*vol;
         }
     }
     
-    DLVOStresses /= scene->cell->getVolume();
+    DLStresses /= scene->cell->getVolume();
+    VdWStresses /= scene->cell->getVolume();
 }
 
 py::tuple Law2_ScGeom_ElectrostaticPhys::PyGetTotalStresses()
 {
-	Matrix3r nc(Matrix3r::Zero()), sc(Matrix3r::Zero()), nl(Matrix3r::Zero()), sl(Matrix3r::Zero()), nd(Matrix3r::Zero());
+	Matrix3r nc(Matrix3r::Zero()), sc(Matrix3r::Zero()), nl(Matrix3r::Zero()), sl(Matrix3r::Zero()), nd(Matrix3r::Zero()), nv(Matrix3r::Zero());
 
     Law2_ScGeom_ImplicitLubricationPhys::getTotalStresses(nc, sc, nl, sl);
-	getTotalStresses(nd);
-	return py::make_tuple(nc, sc, nl, sl, nd);
+	getTotalStresses(nd, nv);
+	return py::make_tuple(nc, sc, nl, sl, nd, nv);
 }
 
 CREATE_LOGGER(Law2_ScGeom_ElectrostaticPhys);
