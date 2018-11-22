@@ -168,7 +168,8 @@ Real Law2_ScGeom_ElectrostaticPhys::DLVO_DichoAdimExp_integrate_u(Real const& un
 		if(F_left*F_right > 0.)
 			LOG_ERROR("Both function have same sign!! d_left=" << d_left << " F_left=" << F_left << " d_right=" << d_right << " F_right=" << F_right);
 		
-		d = (d_left + d_right)/2.;	
+		d = (d_left + d_right)/2.; // Dichotomy
+		//d = d_left - F_left*(d_right - d_left)/(F_right - F_left); // Regula Falsi
 		F = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, A, vdwc, Z, K, d);
 		
 		if(std::abs(F) < SolutionTol)
