@@ -144,6 +144,9 @@ Real Law2_ScGeom_ElectrostaticPhys::DLVO_DichoAdimExp_integrate_u(Real const& un
 		F_right = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, A, vdwc, Z, K, d_right);
 	}
 	
+	if(!std::isfinite(F_left) || std::isfinite(F_right))
+		LOG_ERROR("Initial point problem!! d_left=" << d_left << " F_left=" << F_left << " d_right=" << d_right << " F_right=" << F_right);
+	
 	// Iterate to find the zero.
 	int i;
 	for(i=0;i<MaxIter;i++)
