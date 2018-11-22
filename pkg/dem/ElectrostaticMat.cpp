@@ -132,19 +132,33 @@ Real Law2_ScGeom_ElectrostaticPhys::DLVO_NRAdimExp_integrate_u(Real const& un, R
 Real Law2_ScGeom_ElectrostaticPhys::DLVO_DichoAdimExp_integrate_u(Real const& un, Real const& eps, Real const& alpha, Real const& A, Real const& vdwc, Real const& Z, Real const& K, Real & prevDotU, Real const& dt, Real const& prev_d, Real const& undot)
 {
 	Real F = 0.;
-	Real d_left(prev_d), d_right(prev_d), F_left(F), F_right(F);
+	Real d_left(prev_d-1.), d_right(prev_d+1.);
+	Real F_left(ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, A, vdwc, Z, K, d_left));
+	Real F_right(ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, A, vdwc, Z, K, d_right));
 	Real d;
 	
 	// Init: search for interval that contain sign change
-	while(F_left*F_right >= 0.)
-	{
-		d_left--;
-		d_right++;
-		F_left = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, A, vdwc, Z, K, d_left);
-		F_right = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, A, vdwc, Z, K, d_right);
+	if(F_left*F_right >= 0.) {
+		if(F_left < F_right) { // Increasing function
+			Real inc = (F_left < 0.) ? 1. : -1;
+			while(F_left*F_right >= 0.) {
+				d_left += inc;
+				d_right += inc;
+				F_left = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, A, vdwc, Z, K, d_left);
+				F_right = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, A, vdwc, Z, K, d_right);
+			}
+		} else { // Decreasing function
+			Real inc = (F_left < 0.) ? -1. : 1;
+			while(F_left*F_right >= 0.) {
+				d_left += inc;
+				d_right += inc;
+				F_left = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, A, vdwc, Z, K, d_left);
+				F_right = ObjF(un, eps, alpha, prevDotU, dt, prev_d, undot, A, vdwc, Z, K, d_right);
+			}
+		}
 	}
 	
-	if(!std::isfinite(F_left) || std::isfinite(F_right))
+	if(debug && (!std::isfinite(F_left) || !std::isfinite(F_right)))
 		LOG_ERROR("Initial point problem!! d_left=" << d_left << " F_left=" << F_left << " d_right=" << d_right << " F_right=" << F_right);
 	
 	// Iterate to find the zero.
