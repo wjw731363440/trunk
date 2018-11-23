@@ -39,7 +39,7 @@ void setRefSe3(){
 Real PWaveTimeStep(){return Shop::PWaveTimeStep();};
 Real RayleighWaveTimeStep(){return Shop::RayleighWaveTimeStep();};
 
-py::tuple interactionAnglesHistogram(int axis, int mask, size_t bins, py::tuple aabb, bool sphSph, Real minProjLen){
+py::tuple interactionAnglesHistogram(int axis, int mask, size_t bins, py::list aabb, bool sphSph, Real minProjLen){
 	if(axis<0||axis>2) throw invalid_argument("Axis must be from {0,1,2}=x,y,z.");
 	Vector3r bbMin(Vector3r::Zero()), bbMax(Vector3r::Zero()); bool useBB=py::len(aabb)>0; if(useBB){bbMin=py::extract<Vector3r>(aabb[0])();bbMax=py::extract<Vector3r>(aabb[1])();}
 	Real binStep=Mathr::PI/bins; int axis2=(axis+1)%3, axis3=(axis+2)%3;
@@ -64,7 +64,7 @@ py::tuple interactionAnglesHistogram(int axis, int mask, size_t bins, py::tuple 
 	return py::make_tuple(binMid,val);
 }
 
-py::tuple bodyNumInteractionsHistogram(py::tuple aabb){
+py::tuple bodyNumInteractionsHistogram(py::list aabb){
 	Vector3r bbMin(Vector3r::Zero()), bbMax(Vector3r::Zero()); bool useBB=py::len(aabb)>0; if(useBB){bbMin=py::extract<Vector3r>(aabb[0])();bbMax=py::extract<Vector3r>(aabb[1])();}
 	const shared_ptr<Scene>& rb=Omega::instance().getScene();
 	vector<int> bodyNumIntr; bodyNumIntr.resize(rb->bodies->size(),0);
@@ -466,7 +466,7 @@ BOOST_PYTHON_MODULE(_utils){
 	py::def("approxSectionArea",approxSectionArea,"Compute area of convex hull when when taking (swept) spheres crossing the plane at coord, perpendicular to axis.");
 	py::def("coordsAndDisplacements",coordsAndDisplacements,(py::arg("axis"),py::arg("Aabb")=py::tuple()),"Return tuple of 2 same-length lists for coordinates and displacements (coordinate minus reference coordinate) along given axis (1st arg); if the Aabb=((x_min,y_min,z_min),(x_max,y_max,z_max)) box is given, only bodies within this box will be considered.");
 	py::def("setRefSe3",setRefSe3,"Set reference :yref:`positions<State::refPos>` and :yref:`orientations<State::refOri>` of all :yref:`bodies<Body>` equal to their current :yref:`positions<State::pos>` and :yref:`orientations<State::ori>`.");
-	py::def("interactionAnglesHistogram",interactionAnglesHistogram,(py::arg("axis"),py::arg("mask")=0,py::arg("bins")=20,py::arg("aabb")=py::tuple(),py::arg("sphSph")=0,py::arg("minProjLen")=1e-6));
+	py::def("interactionAnglesHistogram",interactionAnglesHistogram,(py::arg("axis"),py::arg("mask")=0,py::arg("bins")=20,py::arg("aabb")=py::list(),py::arg("sphSph")=0,py::arg("minProjLen")=1e-6));
 	py::def("bodyNumInteractionsHistogram",bodyNumInteractionsHistogram,(py::arg("aabb")));
 	py::def("inscribedCircleCenter",inscribedCircleCenter,(py::arg("v1"),py::arg("v2"),py::arg("v3")),"Return center of inscribed circle for triangle given by its vertices *v1*, *v2*, *v3*.");
 	py::def("unbalancedForce",&Shop__unbalancedForce,(py::args("useMaxForce")=false),"Compute the ratio of mean (or maximum, if *useMaxForce*) summary force on bodies and mean force magnitude on interactions. For perfectly static equilibrium, summary force on all bodies is zero (since forces from interactions cancel out and induce no acceleration of particles); this ratio will tend to zero as simulation stabilizes, though zero is never reached because of finite precision computation. Sufficiently small value can be e.g. 1e-2 or smaller, depending on how much equilibrium it should be.");

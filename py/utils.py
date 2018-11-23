@@ -456,7 +456,7 @@ def plotNumInteractionsHistogram(cutoff=0.):
 	pylab.ion()
 	pylab.show()
 
-def plotDirections(aabb=(),mask=0,bins=20,numHist=True,noShow=False,sphSph=False):
+def plotDirections(aabb=[],mask=0,bins=20,numHist=True,noShow=False,sphSph=False):
 	"""Plot 3 histograms for distribution of interaction directions, in yz,xz and xy planes and
 	(optional but default) histogram of number of interactions per body. If sphSph only sphere-sphere interactions are considered for the 3 directions histograms.
 
